@@ -3,12 +3,12 @@
 
 <head>
 
-<title>Chat</title>
+    <title>Chat</title>
 
-<link rel="stylesheet"
-      href="{{ url_for('static', filename='chat.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='chat.css') }}">
 
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
 </head>
 
@@ -16,7 +16,11 @@
 
 <div class="mobile-container" id="container">
 
+    <!-- TOP BAR -->
+
     <div class="top-bar">
+
+        <!-- LOGOUT -->
 
         <a href="/dashboard">
 
@@ -26,10 +30,14 @@
 
         </a>
 
+        <!-- INVITE -->
+
         <button class="invite-btn"
                 onclick="openPopup()">
             Invite
         </button>
+
+        <!-- THEME -->
 
         <button class="theme-btn"
                 onclick="toggleTheme()"
@@ -39,7 +47,11 @@
 
     </div>
 
+    <!-- MESSAGES -->
+
     <div id="messages" class="messages"></div>
+
+    <!-- INPUT AREA -->
 
     <div class="chat-input-area">
 
@@ -55,36 +67,48 @@
 
 </div>
 
-<!-- POPUP -->
+<!-- INVITE POPUP -->
 
 <div class="popup" id="popup">
 
     <div class="popup-content">
 
-        <h3>Invite User</h3>
+        <h3>
+            Invite Link
+        </h3>
 
-        <input type="email"
-               id="invite-email"
-               placeholder="Enter Email">
+        <input type="text"
+               id="invite-link"
+               readonly>
 
-        <button onclick="sendInvite()">
-            Send Invite
+        <button onclick="copyInviteLink()">
+            Copy Link
         </button>
 
     </div>
 
 </div>
 
+<!-- SCRIPT -->
+
 <script>
 
 var socket = io();
 
 var username = "{{ username }}";
+
 var room = "{{ room }}";
 
+
+// ---------------- JOIN ROOM ----------------
+
 socket.emit('join', {
+
     room: room
 });
+
+
+// ---------------- RECEIVE MESSAGE ----------------
 
 socket.on('message', function(data){
 
@@ -92,15 +116,22 @@ socket.on('message', function(data){
     document.getElementById('messages');
 
     messages.innerHTML += `
+
         <div class="message">
+
             <b>${data.username}</b>
+
             <p>${data.message}</p>
+
         </div>
     `;
 
     messages.scrollTop =
     messages.scrollHeight;
 });
+
+
+// ---------------- SEND MESSAGE ----------------
 
 function sendMessage(){
 
@@ -110,40 +141,47 @@ function sendMessage(){
     let message = input.value;
 
     if(message.trim() == ""){
+
         return;
     }
 
     socket.send({
+
         username: username,
+
         message: message,
+
         room: room
     });
 
     input.value = "";
 }
 
+
+// ---------------- ENTER KEY ----------------
+
 document
 .getElementById("message")
 .addEventListener("keypress", function(e){
 
     if(e.key === "Enter"){
+
         sendMessage();
     }
 });
+
+
+// ---------------- OPEN POPUP ----------------
 
 function openPopup(){
 
     document
     .getElementById("popup")
     .style.display = "flex";
-}
 
-function sendInvite(){
+    // generate invite link
 
-    let email =
-    document.getElementById("invite-email").value;
-
-    fetch("/send-invite", {
+    fetch("/generate-invite", {
 
         method:"POST",
 
@@ -152,23 +190,47 @@ function sendInvite(){
             "application/x-www-form-urlencoded"
         },
 
-        body:
-        `email=${email}&room=${room}`
+        body:`room=${room}`
     })
 
-    .then(res => res.text())
+    .then(res => res.json())
 
     .then(data => {
 
-        alert(data);
-
         document
-        .getElementById("popup")
-        .style.display = "none";
+        .getElementById("invite-link")
+        .value = data.link;
     });
 }
 
+
+// ---------------- COPY LINK ----------------
+
+function copyInviteLink(){
+
+    let input =
+    document.getElementById("invite-link");
+
+    input.select();
+
+    input.setSelectionRange(0, 99999);
+
+    navigator.clipboard.writeText(
+        input.value
+    );
+
+    alert("Invite Link Copied!");
+
+    // close popup after copy
+
+    document
+    .getElementById("popup")
+    .style.display = "none";
+}
+
 </script>
+
+<!-- THEME JS -->
 
 <script src="{{ url_for('static', filename='theme.js') }}"></script>
 

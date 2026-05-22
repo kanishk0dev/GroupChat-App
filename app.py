@@ -1,9 +1,7 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, session, jsonify
 from flask_socketio import SocketIO, join_room, send
 import uuid
 import os
-import json
-import urllib.request
 
 app = Flask(__name__)
 
@@ -21,7 +19,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITES ----------------
+# ---------------- INVITE STORAGE ----------------
 
 invite_links = {}
 
@@ -41,7 +39,7 @@ def login():
 
     session['username'] = username
 
-    # invite flow
+    # invite redirect flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -90,116 +88,38 @@ def logout():
 
     return redirect('/')
 
-# ---------------- SEND INVITE ----------------
+# ---------------- GENERATE INVITE ----------------
 
-@app.route('/send-invite', methods=['POST'])
-def send_invite():
+@app.route('/generate-invite', methods=['POST'])
+def generate_invite():
 
-    try:
+    room = request.form['room']
 
-        email = request.form['email']
+    # generate token
+    token = str(uuid.uuid4())
 
-        room = request.form['room']
+    # store invite
+    invite_links[token] = {
 
-        # unique token
-        token = str(uuid.uuid4())
+        "room": room,
+        "used": False
+    }
 
-        # store invite
-        invite_links[token] = {
+    BASE_URL = request.host_url.rstrip('/')
 
-            "room": room,
-            "used": False
-        }
+    invite_link = f"{BASE_URL}/invite/{token}"
 
-        # base url
-        BASE_URL = request.host_url.rstrip('/')
+    return jsonify({
 
-        # invite link
-        invite_link = f"{BASE_URL}/invite/{token}"
+        "link": invite_link
+    })
 
-        # web3forms access key
-        access_key = os.environ.get(
-            "WEB3FORMS_ACCESS_KEY"
-        )
-
-        # email payload
-        payload = {
-
-            "access_key":
-            access_key,
-
-            "subject":
-            "Chat Room Invitation",
-
-            "from_name":
-            "Realtime Chat App",
-
-            "email":
-            email,
-
-            "message":
-            f"""
-You are invited to join the chat room.
-
-Open this link:
-
-{invite_link}
-
-IMPORTANT:
-This invite works only once.
-"""
-        }
-
-        # convert json
-        data = json.dumps(payload).encode("utf-8")
-
-        # request
-        req = urllib.request.Request(
-
-            "https://api.web3forms.com/submit",
-
-            data=data,
-
-            headers={
-
-                "Content-Type":
-                "application/json"
-            },
-
-            method="POST"
-        )
-
-        # send request
-        response = urllib.request.urlopen(req)
-
-        # response data
-        result = json.loads(
-            response.read().decode()
-        )
-
-        print(result)
-
-        # success
-        if result["success"]:
-
-            return "Invite Sent Successfully!"
-
-        else:
-
-            return "Failed To Send Invite"
-
-    except Exception as e:
-
-        print("ERROR:", e)
-
-        return f"ERROR: {str(e)}"
-
-# ---------------- INVITE ----------------
+# ---------------- INVITE ROUTE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    # invalid link
+    # invalid token
     if token not in invite_links:
 
         return "Invalid Invite Link"
@@ -209,12 +129,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire after first click
+    # expire after first use
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # temporary room
+    # save room temporarily
     session['invite_room'] = room
 
     # redirect login
@@ -227,12 +147,14 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET ----------------
+# ---------------- SOCKET JOIN ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
+
+# ---------------- REALTIME MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
