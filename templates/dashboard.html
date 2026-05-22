@@ -3,7 +3,7 @@
 
 <head>
 
-    <title>Dashboard</title>
+    <title>GroupChat</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='dashboard.css') }}">
@@ -12,28 +12,42 @@
 
 <body>
 
-<div class="mobile-container" id="container">
+<div class="mobile-container"
+     id="container">
+
+    <!-- THEME -->
 
     <button class="theme-btn"
-            onclick="toggleTheme()"
-            id="theme-btn">
+            id="theme-btn"
+            onclick="toggleTheme()">
+
         🌙
+
     </button>
 
-    <div class="dashboard-content">
+    <!-- DASHBOARD -->
 
-        <h2>Welcome {{ username }}</h2>
+    <div class="dashboard-box">
+
+        <h1>
+            Hello {{ username }}
+        </h1>
+
 
         <input type="text"
                id="room-id"
                placeholder="Enter Room ID">
 
-        <button onclick="generateRoomID()">
+        <button onclick="generateRoomId()">
+
             Generate Room ID
+
         </button>
 
         <button onclick="joinRoom()">
+
             Join Room
+
         </button>
 
     </div>
@@ -42,31 +56,26 @@
 
 <script>
 
-function generateRoomID(){
+function generateRoomId(){
 
-    let chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let randomId =
+    Math.random().toString(36)
+    .substring(2, 8);
 
-    let room = "";
-
-    for(let i=0; i<6; i++){
-
-        room += chars.charAt(
-            Math.floor(Math.random() * chars.length)
-        );
-    }
-
-    document.getElementById('room-id').value = room;
+    document
+    .getElementById("room-id")
+    .value = randomId;
 }
 
 function joinRoom(){
 
     let room =
-    document.getElementById('room-id').value;
+    document
+    .getElementById("room-id")
+    .value;
 
     if(room.trim() == ""){
 
-        alert("Enter Room ID");
         return;
     }
 
@@ -74,9 +83,12 @@ function joinRoom(){
     "/chat/" + room;
 }
 
-document.addEventListener("keypress", function(e){
+document
+.getElementById("room-id")
+.addEventListener("keypress", function(e){
 
     if(e.key === "Enter"){
+
         joinRoom();
     }
 });

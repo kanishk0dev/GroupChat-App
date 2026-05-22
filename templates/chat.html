@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html>
 
 <head>
 
-    <title>Chat</title>
+    <title>GroupChat</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='chat.css') }}">
@@ -14,64 +14,84 @@
 
 <body>
 
-<div class="mobile-container" id="container">
+<div class="mobile-container"
+     id="container">
 
     <!-- TOP BAR -->
 
     <div class="top-bar">
 
-        <!-- LOGOUT -->
+        <div class="left-section">
 
-        <a href="/dashboard">
+            <a href="/dashboard">
 
-            <button class="logout-btn">
-                ✖
+                <button class="logout-btn">
+
+                    ✖
+
+                </button>
+
+            </a>
+
+            {% if is_admin %}
+
+            <button class="invite-btn"
+                    onclick="openPopup()">
+
+                Invite
+
             </button>
 
-        </a>
+            {% endif %}
 
-        <!-- INVITE BUTTON -->
+        </div>
 
-        {% if is_admin %}
+        <div class="right-section">
 
-        <button class="invite-btn"
-                onclick="openPopup()">
-            Invite
-        </button>
+            <!-- USERS -->
 
-        {% else %}
+            <button class="users-btn"
+                    onclick="openUsersPopup()">
 
-        <button class="invite-btn disabled-btn"
-                disabled>
-            Invite Disabled
-        </button>
+                👥
 
-        {% endif %}
+                <span id="user-count">
+                    1
+                </span>
 
-        <!-- THEME -->
+            </button>
 
-        <button class="theme-btn"
-                onclick="toggleTheme()"
-                id="theme-btn">
-            🌙
-        </button>
+            <!-- THEME -->
+
+            <button class="theme-btn"
+                    onclick="toggleTheme()"
+                    id="theme-btn">
+
+                🌙
+
+            </button>
+
+        </div>
 
     </div>
 
-    <!-- MESSAGES -->
+    <!-- CHAT -->
 
-    <div id="messages" class="messages"></div>
+    <div id="messages"
+         class="messages"></div>
 
-    <!-- CHAT INPUT -->
+    <!-- INPUT -->
 
     <div class="chat-input-area">
 
         <input type="text"
                id="message"
-               placeholder="Type message...">
+               placeholder="Write a message...">
 
         <button onclick="sendMessage()">
+
             Send
+
         </button>
 
     </div>
@@ -80,7 +100,8 @@
 
 <!-- INVITE POPUP -->
 
-<div class="popup" id="popup">
+<div class="popup"
+     id="popup">
 
     <div class="popup-content">
 
@@ -93,14 +114,37 @@
                readonly>
 
         <button onclick="copyInviteLink()">
+
             Copy Link
+
         </button>
+
+        <div id="copy-success">
+
+            Link Copied Successfully
+
+        </div>
 
     </div>
 
 </div>
 
-<!-- SCRIPT -->
+<!-- USERS POPUP -->
+
+<div class="popup"
+     id="users-popup">
+
+    <div class="popup-content">
+
+        <h3>
+            Users In Chat
+        </h3>
+
+        <div id="users-list"></div>
+
+    </div>
+
+</div>
 
 <script>
 
@@ -110,12 +154,18 @@ var username = "{{ username }}";
 
 var room = "{{ room }}";
 
+var user_id = "{{ session['user_id'] }}";
 
-// ---------------- JOIN ROOM ----------------
+
+// ---------------- JOIN ----------------
 
 socket.emit('join', {
 
-    room: room
+    room: room,
+
+    username: username,
+
+    user_id: user_id
 });
 
 
@@ -126,13 +176,63 @@ socket.on('message', function(data){
     let messages =
     document.getElementById('messages');
 
+    let isMine =
+    data.user_id === user_id;
+
+    let currentTime =
+    new Date().toLocaleTimeString([], {
+
+        hour: '2-digit',
+
+        minute: '2-digit'
+    });
+
+    let messageClass =
+    isMine ? "my-message" : "other-message";
+
+    let nameHTML =
+    isMine
+    ? ""
+    : `<div class="sender-name">
+            ${data.username}
+       </div>`;
+
+    let deleteButton =
+    isMine
+    ? `
+    <button class="delete-btn"
+            onclick="deleteMessage('${data.id}')">
+
+        🗑️
+
+    </button>
+    `
+    : "";
+
     messages.innerHTML += `
 
-        <div class="message">
+        <div class="message-wrapper ${messageClass}"
+             id="${data.id}">
 
-            <b>${data.username}</b>
+            ${nameHTML}
 
-            <p>${data.message}</p>
+            <div class="message">
+
+                ${deleteButton}
+
+                <div class="message-text">
+
+                    ${data.message}
+
+                </div>
+
+                <div class="message-time">
+
+                    ${currentTime}
+
+                </div>
+
+            </div>
 
         </div>
     `;
@@ -142,21 +242,47 @@ socket.on('message', function(data){
 });
 
 
-// ---------------- SEND MESSAGE ----------------
+// ---------------- USER STATUS ----------------
+
+socket.on('user_status', function(data){
+
+    let messages =
+    document.getElementById('messages');
+
+    messages.innerHTML += `
+
+        <div class="status-message">
+
+            ${data.message}
+
+        </div>
+    `;
+
+    messages.scrollTop =
+    messages.scrollHeight;
+});
+
+
+// ---------------- SEND ----------------
 
 function sendMessage(){
 
     let input =
     document.getElementById('message');
 
-    let message = input.value;
+    let message =
+    input.value;
 
     if(message.trim() == ""){
 
         return;
     }
 
-    socket.send({
+    socket.emit('message', {
+
+        id: crypto.randomUUID(),
+
+        user_id: user_id,
 
         username: username,
 
@@ -169,7 +295,78 @@ function sendMessage(){
 }
 
 
-// ---------------- ENTER KEY ----------------
+// ---------------- DELETE ----------------
+
+function deleteMessage(id){
+
+    socket.emit('delete_message', {
+
+        id:id,
+
+        room:room
+    });
+}
+
+
+// ---------------- RECEIVE DELETE ----------------
+
+socket.on('delete_message', function(data){
+
+    let msg =
+    document.getElementById(data.id);
+
+    if(msg){
+
+        msg.remove();
+    }
+});
+
+
+// ---------------- UPDATE USERS ----------------
+
+socket.on('update_users', function(data){
+
+    document
+    .getElementById("user-count")
+    .innerText = data.count;
+
+    let usersList =
+    document.getElementById("users-list");
+
+    usersList.innerHTML = "";
+
+    data.users.forEach(user => {
+
+        let div =
+        document.createElement("div");
+
+        div.classList.add("user-item");
+
+        if(user.admin){
+
+            div.innerHTML = `
+                ${user.username}
+
+                <span class="admin-tag">
+
+                    Admin
+
+                </span>
+            `;
+        }
+
+        else{
+
+            div.innerHTML =
+            user.username;
+        }
+
+        usersList.appendChild(div);
+    });
+});
+
+
+// ---------------- ENTER ----------------
 
 document
 .getElementById("message")
@@ -182,15 +379,13 @@ document
 });
 
 
-// ---------------- OPEN POPUP ----------------
+// ---------------- OPEN INVITE ----------------
 
 function openPopup(){
 
     document
     .getElementById("popup")
     .style.display = "flex";
-
-    // generate invite link
 
     fetch("/generate-invite", {
 
@@ -215,7 +410,7 @@ function openPopup(){
 }
 
 
-// ---------------- COPY LINK ----------------
+// ---------------- COPY ----------------
 
 function copyInviteLink(){
 
@@ -224,24 +419,56 @@ function copyInviteLink(){
 
     input.select();
 
-    input.setSelectionRange(0, 99999);
-
     navigator.clipboard.writeText(
         input.value
     );
 
-    alert("Invite Link Copied!");
-
-    // close popup
-
     document
-    .getElementById("popup")
-    .style.display = "none";
+    .getElementById("copy-success")
+    .style.display = "block";
+
+    setTimeout(() => {
+
+        document
+        .getElementById("copy-success")
+        .style.display = "none";
+
+    }, 2000);
 }
 
-</script>
 
-<!-- THEME JS -->
+// ---------------- USERS POPUP ----------------
+
+function openUsersPopup(){
+
+    document
+    .getElementById("users-popup")
+    .style.display = "flex";
+}
+
+
+// ---------------- CLOSE POPUPS ----------------
+
+window.onclick = function(e){
+
+    let popup =
+    document.getElementById("popup");
+
+    let usersPopup =
+    document.getElementById("users-popup");
+
+    if(e.target == popup){
+
+        popup.style.display = "none";
+    }
+
+    if(e.target == usersPopup){
+
+        usersPopup.style.display = "none";
+    }
+};
+
+</script>
 
 <script src="{{ url_for('static', filename='theme.js') }}"></script>
 

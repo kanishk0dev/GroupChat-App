@@ -13,17 +13,21 @@ body{
 
     height:100vh;
 
-    font-family:Arial;
+    font-family:Arial, sans-serif;
 }
+
+
+/* ---------------- CONTAINER ---------------- */
 
 .mobile-container{
 
-    width:350px;
-    height:700px;
+    width:430px;
+
+    height:880px;
 
     background:white;
 
-    border-radius:40px;
+    border-radius:45px;
 
     padding:20px;
 
@@ -35,21 +39,63 @@ body{
 
     position:relative;
 
-    box-shadow:0px 0px 30px rgba(0,0,0,0.4);
+    box-shadow:0px 0px 40px rgba(0,0,0,0.45);
+
+    transition:0.3s;
 }
 
 
-/* ---------------- DARK THEME ---------------- */
+/* ---------------- DARK ---------------- */
 
 .dark-theme{
 
-    background:#111827 !important;
+    background:#0f172a !important;
 
     color:white;
 }
 
+.dark-theme .messages{
 
-/* ---------------- TOP BAR ---------------- */
+    background:#1e293b;
+}
+
+.dark-theme .other-message .message{
+
+    background:#334155;
+
+    color:white;
+}
+
+.dark-theme input{
+
+    background:#1e293b !important;
+
+    color:white;
+}
+
+.dark-theme .popup-content{
+
+    background:#1e293b;
+
+    color:white;
+}
+
+.dark-theme .user-item{
+
+    background:#334155;
+
+    color:white;
+}
+
+.dark-theme .status-message{
+
+    background:#334155;
+
+    color:#e2e8f0;
+}
+
+
+/* ---------------- TOP ---------------- */
 
 .top-bar{
 
@@ -62,76 +108,119 @@ body{
     margin-bottom:20px;
 }
 
+.left-section,
+.right-section{
 
-/* ---------------- LOGOUT BUTTON ---------------- */
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+}
+
+
+/* ---------------- BUTTONS ---------------- */
+
+.logout-btn,
+.invite-btn,
+.theme-btn,
+.users-btn{
+
+    border:none;
+
+    cursor:pointer;
+
+    transition:0.3s;
+}
+
+
+/* ---------------- LOGOUT ---------------- */
 
 .logout-btn{
 
-    background:red;
+    background:#ef4444;
 
     color:white;
 
-    border:none;
+    width:48px;
 
-    padding:10px 15px;
+    height:48px;
 
-    border-radius:10px;
+    border-radius:14px;
 
-    cursor:pointer;
+    font-size:16px;
 }
 
 
-/* ---------------- INVITE BUTTON ---------------- */
+/* ---------------- INVITE ---------------- */
 
 .invite-btn{
 
-    background:#2563eb;
+    background:linear-gradient(
+        135deg,
+        #2563eb,
+        #3b82f6
+    );
 
     color:white;
 
-    border:none;
+    padding:12px 20px;
 
-    padding:10px 20px;
+    border-radius:14px;
 
-    border-radius:10px;
+    font-weight:bold;
 
-    cursor:pointer;
+    font-size:14px;
 }
 
 
-/* ---------------- DISABLED INVITE ---------------- */
+/* ---------------- USERS ---------------- */
 
-.disabled-btn{
+.users-btn{
 
-    background:gray !important;
+    background:linear-gradient(
+        135deg,
+        #10b981,
+        #059669
+    );
 
-    cursor:not-allowed !important;
+    color:white;
 
-    opacity:0.7;
+    width:58px;
+
+    height:48px;
+
+    border-radius:14px;
+
+    font-size:13px;
+
+    font-weight:bold;
 }
 
 
-/* ---------------- THEME BUTTON ---------------- */
+/* ---------------- THEME ---------------- */
 
 .theme-btn{
 
-    background:#facc15;
+    width:48px;
 
-    border:none;
-
-    width:45px;
-
-    height:45px;
+    height:48px;
 
     border-radius:50%;
 
-    cursor:pointer;
+    background:linear-gradient(
+        135deg,
+        #8b5cf6,
+        #7c3aed
+    );
+
+    color:white;
 
     font-size:18px;
 }
 
 
-/* ---------------- MESSAGE AREA ---------------- */
+/* ---------------- CHAT ---------------- */
 
 .messages{
 
@@ -139,75 +228,229 @@ body{
 
     overflow-y:auto;
 
-    background:#f1f5f9;
+    padding:12px;
 
-    border-radius:10px;
+    border-radius:22px;
 
-    padding:10px;
-}
-
-
-/* ---------------- SINGLE MESSAGE ---------------- */
-
-.message{
-
-    background:white;
-
-    padding:10px;
-
-    border-radius:10px;
-
-    margin-bottom:10px;
-
-    word-wrap:break-word;
-}
-
-
-/* ---------------- INPUT AREA ---------------- */
-
-.chat-input-area{
+    background:#f8fafc;
 
     display:flex;
 
-    gap:10px;
+    flex-direction:column;
 
-    margin-top:20px;
+    gap:14px;
+
+    transition:0.3s;
 }
 
 
-/* ---------------- INPUT ---------------- */
+/* ---------------- SCROLL ---------------- */
 
-.chat-input-area input{
+.messages::-webkit-scrollbar{
 
-    flex:1;
+    width:7px;
+}
 
-    padding:15px;
+.messages::-webkit-scrollbar-thumb{
 
-    border:none;
+    background:#64748b;
 
-    border-radius:10px;
-
-    background:#f1f5f9;
-
-    outline:none;
+    border-radius:20px;
 }
 
 
-/* ---------------- SEND BUTTON ---------------- */
+/* ---------------- STATUS MESSAGE ---------------- */
 
-.chat-input-area button{
+.status-message{
 
-    padding:15px;
+    align-self:center;
 
-    border:none;
+    background:#e2e8f0;
 
-    border-radius:10px;
+    color:#475569;
+
+    padding:8px 16px;
+
+    border-radius:14px;
+
+    font-size:13px;
+
+    font-weight:bold;
+
+    margin:5px 0;
+}
+
+
+/* ---------------- WRAPPER ---------------- */
+
+.message-wrapper{
+
+    display:flex;
+
+    flex-direction:column;
+
+    max-width:75%;
+}
+
+.my-message{
+
+    align-self:flex-end;
+
+    align-items:flex-end;
+}
+
+.other-message{
+
+    align-self:flex-start;
+
+    align-items:flex-start;
+}
+
+
+/* ---------------- NAME ---------------- */
+
+.sender-name{
+
+    font-size:12px;
+
+    margin-bottom:5px;
+
+    color:#94a3b8;
+
+    font-weight:bold;
+}
+
+
+/* ---------------- MESSAGE ---------------- */
+
+.message{
+
+    padding:14px;
+
+    border-radius:18px;
+
+    position:relative;
+}
+
+.my-message .message{
 
     background:#2563eb;
 
     color:white;
 
+    border-bottom-right-radius:5px;
+}
+
+.other-message .message{
+
+    background:white;
+
+    color:black;
+
+    border-bottom-left-radius:5px;
+}
+
+
+/* ---------------- TEXT ---------------- */
+
+.message-text{
+
+    font-size:15px;
+
+    line-height:1.5;
+}
+
+
+/* ---------------- TIME ---------------- */
+
+.message-time{
+
+    font-size:11px;
+
+    margin-top:7px;
+
+    opacity:0.7;
+
+    text-align:right;
+}
+
+
+/* ---------------- DELETE ---------------- */
+
+.delete-btn{
+
+    position:absolute;
+
+    top:4px;
+
+    right:4px;
+
+    background:none;
+
+    border:none;
+
+    color:red;
+
+    font-size:11px;
+
     cursor:pointer;
+
+    display:none;
+}
+
+.my-message:hover .delete-btn{
+
+    display:block;
+}
+
+
+/* ---------------- INPUT ---------------- */
+
+.chat-input-area{
+
+    display:flex;
+
+    gap:12px;
+
+    margin-top:20px;
+}
+
+.chat-input-area input{
+
+    flex:1;
+
+    padding:16px;
+
+    border:none;
+
+    border-radius:18px;
+
+    background:#f1f5f9;
+
+    outline:none;
+
+    font-size:15px;
+}
+
+.chat-input-area button{
+
+    padding:16px 24px;
+
+    border:none;
+
+    border-radius:18px;
+
+    background:linear-gradient(
+        135deg,
+        #2563eb,
+        #3b82f6
+    );
+
+    color:white;
+
+    cursor:pointer;
+
+    font-weight:bold;
 }
 
 
@@ -237,19 +480,21 @@ body{
 
 .popup-content{
 
+    width:320px;
+
     background:white;
 
-    padding:20px;
+    padding:25px;
 
-    border-radius:20px;
+    border-radius:24px;
 
     display:flex;
 
     flex-direction:column;
 
-    gap:15px;
+    gap:18px;
 
-    width:300px;
+    transition:0.3s;
 }
 
 
@@ -261,7 +506,7 @@ body{
 
     border:none;
 
-    border-radius:10px;
+    border-radius:14px;
 
     background:#f1f5f9;
 
@@ -273,15 +518,71 @@ body{
 
 .popup-content button{
 
-    padding:15px;
+    padding:14px;
 
     border:none;
 
-    border-radius:10px;
+    border-radius:14px;
+
+    background:linear-gradient(
+        135deg,
+        #8b5cf6,
+        #7c3aed
+    );
+
+    color:white;
+
+    cursor:pointer;
+
+    font-weight:bold;
+}
+
+
+/* ---------------- COPY ---------------- */
+
+#copy-success{
+
+    color:#22c55e;
+
+    font-size:13px;
+
+    display:none;
+
+    text-align:center;
+
+    font-weight:bold;
+}
+
+
+/* ---------------- USERS LIST ---------------- */
+
+.user-item{
+
+    padding:12px;
+
+    border-radius:12px;
+
+    background:#f1f5f9;
+
+    margin-bottom:10px;
+
+    font-weight:bold;
+}
+
+
+/* ---------------- ADMIN ---------------- */
+
+.admin-tag{
 
     background:#2563eb;
 
     color:white;
 
-    cursor:pointer;
+    padding:4px 8px;
+
+    border-radius:10px;
+
+    font-size:11px;
+
+    margin-left:8px;
 }

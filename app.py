@@ -1,9 +1,20 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
-from flask_socketio import SocketIO, join_room, send
+from flask_socketio import SocketIO, join_room, leave_room, emit
 import uuid
 import os
 
 app = Flask(__name__)
+
+# ---------------- IFRAME SUPPORT ----------------
+
+@app.after_request
+def add_header(response):
+
+    response.headers['X-Frame-Options'] = 'ALLOWALL'
+
+    response.headers['Content-Security-Policy'] = "frame-ancestors *"
+
+    return response
 
 # ---------------- SECRET KEY ----------------
 
@@ -25,6 +36,10 @@ invite_links = {}
 
 room_admins = {}
 
+room_users = {}
+
+connected_users = {}
+
 # ---------------- HOME ----------------
 
 @app.route('/')
@@ -39,21 +54,22 @@ def login():
 
     username = request.form['username']
 
+    # hidden unique id
+    session['user_id'] = str(uuid.uuid4())
+
     session['username'] = username
 
-    # invited user flow
+    # invite flow
     if 'invite_room' in session:
 
         room = session['invite_room']
 
         session.pop('invite_room', None)
 
-        # invited users cannot invite others
         session['is_invited_user'] = True
 
         return redirect(f'/chat/{room}')
 
-    # normal dashboard login
     session['is_invited_user'] = False
 
     return redirect('/dashboard')
@@ -68,7 +84,9 @@ def dashboard():
         return redirect('/')
 
     return render_template(
+
         'dashboard.html',
+
         username=session['username']
     )
 
@@ -83,15 +101,14 @@ def chat(room):
 
     username = session['username']
 
-    # set admin if room created first time
+    # first user becomes admin
     if room not in room_admins:
 
         room_admins[room] = username
 
-    # check admin
     is_admin = room_admins[room] == username
 
-    # invited users never admin
+    # invited users cannot invite
     if session.get('is_invited_user'):
 
         is_admin = False
@@ -121,21 +138,19 @@ def logout():
 @app.route('/generate-invite', methods=['POST'])
 def generate_invite():
 
-    # only admin can invite
+    # invited users blocked
     if session.get('is_invited_user'):
 
         return jsonify({
 
             "error":
-            "You are not allowed to invite users"
+            "Not Allowed"
         })
 
     room = request.form['room']
 
-    # generate token
     token = str(uuid.uuid4())
 
-    # store invite
     invite_links[token] = {
 
         "room": room,
@@ -151,30 +166,26 @@ def generate_invite():
         "link": invite_link
     })
 
-# ---------------- INVITE ROUTE ----------------
+# ---------------- INVITE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    # invalid token
     if token not in invite_links:
 
         return "Invalid Invite Link"
 
-    # already used
     if invite_links[token]["used"]:
 
         return "Invite Link Expired"
 
-    # expire after first use
+    # one time use
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room temporarily
     session['invite_room'] = room
 
-    # redirect login
     return redirect('/')
 
 # ---------------- EMBED ----------------
@@ -184,19 +195,179 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET JOIN ----------------
+# ---------------- UPDATE USERS ----------------
+
+def update_room_users(room):
+
+    if room not in room_users:
+
+        room_users[room] = []
+
+    users_list = []
+
+    for user in room_users[room]:
+
+        users_list.append({
+
+            "username": user['username'],
+
+            "admin":
+            user['username'] == room_admins.get(room)
+        })
+
+    socketio.emit(
+
+        'update_users',
+
+        {
+
+            "count": len(room_users[room]),
+
+            "users": users_list
+        },
+
+        room=room
+    )
+
+# ---------------- JOIN ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
-    join_room(data['room'])
+    room = data['room']
 
-# ---------------- REALTIME MESSAGE ----------------
+    username = data['username']
+
+    user_id = data['user_id']
+
+    join_room(room)
+
+    connected_users[request.sid] = {
+
+        "username": username,
+
+        "room": room,
+
+        "user_id": user_id
+    }
+
+    if room not in room_users:
+
+        room_users[room] = []
+
+    # unique by user_id
+    user_exists = False
+
+    for user in room_users[room]:
+
+        if user['user_id'] == user_id:
+
+            user_exists = True
+
+    if not user_exists:
+
+        room_users[room].append({
+
+            "user_id": user_id,
+
+            "username": username
+        })
+
+        # joined message
+
+        emit(
+
+            'user_status',
+
+            {
+
+                "message":
+                f"{username} joined the chat"
+            },
+
+            room=room
+        )
+
+    update_room_users(room)
+
+# ---------------- MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
 
-    send(data, to=data['room'])
+    emit(
+
+        'message',
+
+        data,
+
+        room=data['room']
+    )
+
+# ---------------- DELETE MESSAGE ----------------
+
+@socketio.on('delete_message')
+def delete_message(data):
+
+    emit(
+
+        'delete_message',
+
+        {
+
+            "id": data['id']
+
+        },
+
+        room=data['room']
+    )
+
+# ---------------- DISCONNECT ----------------
+
+@socketio.on('disconnect')
+def disconnect_user():
+
+    if request.sid not in connected_users:
+
+        return
+
+    user_data = connected_users[request.sid]
+
+    room = user_data['room']
+
+    user_id = user_data['user_id']
+
+    username = user_data['username']
+
+    leave_room(room)
+
+    if room in room_users:
+
+        room_users[room] = [
+
+            user for user in room_users[room]
+
+            if user['user_id'] != user_id
+        ]
+
+    # left message
+
+    emit(
+
+        'user_status',
+
+        {
+
+            "message":
+            f"{username} left the chat"
+        },
+
+        room=room
+    )
+
+    update_room_users(room)
+
+    del connected_users[request.sid]
 
 # ---------------- MAIN ----------------
 

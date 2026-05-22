@@ -3,7 +3,7 @@
 
 <head>
 
-    <title>Login</title>
+    <title>GroupChat</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='login.css') }}">
@@ -12,27 +12,44 @@
 
 <body>
 
-<div class="mobile-container" id="container">
+<div class="mobile-container"
+     id="container">
+
+    <!-- THEME -->
 
     <button class="theme-btn"
-            onclick="toggleTheme()"
-            id="theme-btn">
+            id="theme-btn"
+            onclick="toggleTheme()">
+
         🌙
+
     </button>
+
+    <!-- LOGIN -->
 
     <div class="login-box">
 
-        <h2>Enter Your Name</h2>
+        <h1>
+            WELCOME
+        </h1>
 
-        <form action="/login" method="POST">
+        <p>
+            Enter your name to continue
+        </p>
+
+        <form action="/login"
+              method="POST">
 
             <input type="text"
                    name="username"
-                   placeholder="Your Name"
+                   id="username"
+                   placeholder="Enter your name"
                    required>
 
             <button type="submit">
+
                 Proceed
+
             </button>
 
         </form>
@@ -40,6 +57,20 @@
     </div>
 
 </div>
+
+<script>
+
+document
+.getElementById("username")
+.addEventListener("keypress", function(e){
+
+    if(e.key === "Enter"){
+
+        this.form.submit();
+    }
+});
+
+</script>
 
 <script src="{{ url_for('static', filename='theme.js') }}"></script>
 
