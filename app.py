@@ -21,7 +21,10 @@ mail = Mail(app)
 
 # ---------------- SOCKET ----------------
 
-socketio = SocketIO(app)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*"
+)
 
 # ---------------- INVITES ----------------
 
