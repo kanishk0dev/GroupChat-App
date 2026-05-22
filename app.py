@@ -5,6 +5,12 @@ import os
 
 app = Flask(__name__)
 
+# ---------------- SESSION CONFIG ----------------
+
+app.config['SESSION_COOKIE_SAMESITE'] = "None"
+
+app.config['SESSION_COOKIE_SECURE'] = True
+
 # ---------------- IFRAME SUPPORT ----------------
 
 @app.after_request
@@ -26,8 +32,12 @@ app.secret_key = os.environ.get(
 # ---------------- SOCKET ----------------
 
 socketio = SocketIO(
+
     app,
-    cors_allowed_origins="*"
+
+    cors_allowed_origins="*",
+
+    manage_session=True
 )
 
 # ---------------- STORAGE ----------------
@@ -57,7 +67,7 @@ def login():
 
     username = request.form['username']
 
-    # unique hidden user id
+    # hidden unique user id
     session['user_id'] = str(uuid.uuid4())
 
     session['username'] = username
