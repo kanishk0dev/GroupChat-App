@@ -1,21 +1,33 @@
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
 from flask_mail import Mail, Message
 import uuid
+import os
 
 app = Flask(__name__)
 
-app.secret_key = "secret123"
+# ---------------- SECRET KEY ----------------
+
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "secret123"
+)
 
 # ---------------- MAIL CONFIG ----------------
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+
 app.config['MAIL_PORT'] = 587
+
 app.config['MAIL_USE_TLS'] = True
 
-app.config['MAIL_USERNAME'] = 'groupchatapp1@gmail.com'
+app.config['MAIL_USERNAME'] = os.environ.get(
+    "MAIL_USERNAME"
+)
 
-app.config['MAIL_PASSWORD'] = 'hahy kond rzjy vbpo'
+app.config['MAIL_PASSWORD'] = os.environ.get(
+    "MAIL_PASSWORD"
+)
 
 mail = Mail(app)
 
@@ -36,14 +48,6 @@ invite_links = {}
 def home():
 
     return render_template('login.html')
-
-
-# ---------------- IFRAME ----------------
-
-@app.route('/embed')
-def embed():
-
-    return render_template('embed.html')
 
 # ---------------- LOGIN ----------------
 
@@ -109,17 +113,23 @@ def logout():
 def send_invite():
 
     email = request.form['email']
+
     room = request.form['room']
 
+    # generate unique token
     token = str(uuid.uuid4())
 
+    # store invite
     invite_links[token] = {
 
         "room": room,
         "used": False
     }
 
-    invite_link = f"http://127.0.0.1:5000/invite/{token}"
+    # production url
+    BASE_URL = request.host_url.rstrip('/')
+
+    invite_link = f"{BASE_URL}/invite/{token}"
 
     # ---------------- EMAIL ----------------
 
@@ -142,15 +152,23 @@ Click the link below:
 {invite_link}
 
 IMPORTANT:
-This link can only be used ONE TIME.
+This invite link works ONLY ONE TIME.
 
-After opening once,
+After first use,
 it will expire automatically.
 """
 
-    mail.send(msg)
+    try:
 
-    return "Invite Sent Successfully!"
+        mail.send(msg)
+
+        return "Invite Sent Successfully!"
+
+    except Exception as e:
+
+        print(e)
+
+        return "Failed To Send Email"
 
 # ---------------- INVITE ----------------
 
@@ -167,18 +185,25 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link after first click
+    # expire link
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room temporarily
+    # temporary session
     session['invite_room'] = room
 
-    # redirect to login
+    # redirect login
     return redirect('/')
 
-# ---------------- SOCKET ----------------
+# ---------------- EMBED ----------------
+
+@app.route('/embed')
+def embed():
+
+    return render_template('embed.html')
+
+# ---------------- SOCKET EVENTS ----------------
 
 @socketio.on('join')
 def handle_join(data):
@@ -195,8 +220,10 @@ def handle_message(data):
 
 if __name__ == '__main__':
 
+    port = int(os.environ.get("PORT", 5000))
+
     socketio.run(
         app,
         host='0.0.0.0',
-        port=5000
+        port=port
     )
