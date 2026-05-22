@@ -1,10 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
+from flask_mail import Mail, Message
 import uuid
 import os
-import json
-import urllib.request
-import urllib.error
 
 app = Flask(__name__)
 
@@ -15,6 +13,24 @@ app.secret_key = os.environ.get(
     "secret123"
 )
 
+# ---------------- MAIL CONFIG ----------------
+
+app.config['MAIL_SERVER'] = 'smtp-relay.brevo.com'
+
+app.config['MAIL_PORT'] = 587
+
+app.config['MAIL_USE_TLS'] = True
+
+app.config['MAIL_USERNAME'] = os.environ.get(
+    "MAIL_USERNAME"
+)
+
+app.config['MAIL_PASSWORD'] = os.environ.get(
+    "MAIL_PASSWORD"
+)
+
+mail = Mail(app)
+
 # ---------------- SOCKET ----------------
 
 socketio = SocketIO(
@@ -22,7 +38,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITE STORAGE ----------------
+# ---------------- INVITES ----------------
 
 invite_links = {}
 
@@ -102,121 +118,73 @@ def send_invite():
 
         room = request.form['room']
 
-        # generate unique token
+        # unique token
         token = str(uuid.uuid4())
 
-        # save invite
+        # store invite
         invite_links[token] = {
 
             "room": room,
             "used": False
         }
 
-        # base url
         BASE_URL = request.host_url.rstrip('/')
 
-        # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
-        # resend api key
-        api_key = os.environ.get(
-            "RESEND_API_KEY"
-        )
+        # email message
+        msg = Message(
 
-        # email payload
-        payload = {
-
-            "from":
-            "groupchatapp1@gmail.com",
-
-            "to":
-            [email],
-
-            "subject":
             "Chat Room Invitation",
 
-            "html":
-            f"""
-            <div style='font-family:Arial;padding:20px;'>
+            sender=app.config['MAIL_USERNAME'],
 
-                <h2>
-                    You are invited!
-                </h2>
-
-                <p>
-                    Click below to join the chat room:
-                </p>
-
-                <a href="{invite_link}"
-                   style="
-                        background:#2563eb;
-                        color:white;
-                        padding:12px 20px;
-                        border-radius:10px;
-                        text-decoration:none;
-                        display:inline-block;
-                   ">
-                    Join Chat Room
-                </a>
-
-                <br><br>
-
-                <b>
-                    This invite link works only once.
-                </b>
-
-            </div>
-            """
-        }
-
-        # convert json
-        data = json.dumps(payload).encode("utf-8")
-
-        # api request
-        req = urllib.request.Request(
-
-            "https://api.resend.com/emails",
-
-            data=data,
-
-            headers={
-
-                "Authorization":
-                f"Bearer {api_key}",
-
-                "Content-Type":
-                "application/json"
-            },
-
-            method="POST"
+            recipients=[email]
         )
 
-        # send request
-        try:
+        msg.html = f"""
 
-            response = urllib.request.urlopen(req)
+        <div style="font-family:Arial;">
 
-            response_data = response.read().decode()
+            <h2>
+                You are invited!
+            </h2>
 
-            print("SUCCESS:", response_data)
+            <p>
+                Click below to join:
+            </p>
 
-            return "Invite Sent Successfully!"
+            <a href="{invite_link}"
+               style="
+                    background:#2563eb;
+                    color:white;
+                    padding:12px 20px;
+                    border-radius:10px;
+                    text-decoration:none;
+               ">
+                Join Chat Room
+            </a>
 
-        except urllib.error.HTTPError as e:
+            <br><br>
 
-            error_message = e.read().decode()
+            <b>
+                This link works only once.
+            </b>
 
-            print("HTTP ERROR:", error_message)
+        </div>
+        """
 
-            return f"ERROR: {error_message}"
+        mail.send(msg)
+
+        return "Invite Sent Successfully!"
 
     except Exception as e:
 
-        print("ERROR:", e)
+        print(e)
 
         return f"ERROR: {str(e)}"
 
-# ---------------- INVITE ROUTE ----------------
+# ---------------- INVITE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
@@ -231,15 +199,15 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire after first use
+    # expire link
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # temporary room session
+    # save room in session
     session['invite_room'] = room
 
-    # redirect to login
+    # redirect login
     return redirect('/')
 
 # ---------------- EMBED ----------------
@@ -249,14 +217,12 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET JOIN ----------------
+# ---------------- SOCKET ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
-
-# ---------------- REALTIME MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
