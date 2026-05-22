@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
 import uuid
 import os
-import requests
+import json
+import urllib.request
 
 app = Flask(__name__)
 
@@ -20,7 +21,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITE STORAGE ----------------
+# ---------------- INVITES ----------------
 
 invite_links = {}
 
@@ -40,7 +41,7 @@ def login():
 
     session['username'] = username
 
-    # invite redirect flow
+    # invite flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -100,7 +101,7 @@ def send_invite():
 
         room = request.form['room']
 
-        # generate unique token
+        # unique token
         token = str(uuid.uuid4())
 
         # store invite
@@ -116,7 +117,7 @@ def send_invite():
         # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
-        # web3forms key
+        # web3forms access key
         access_key = os.environ.get(
             "WEB3FORMS_ACCESS_KEY"
         )
@@ -149,15 +150,32 @@ This invite works only once.
 """
         }
 
-        # send email request
-        response = requests.post(
+        # convert json
+        data = json.dumps(payload).encode("utf-8")
+
+        # request
+        req = urllib.request.Request(
 
             "https://api.web3forms.com/submit",
 
-            json=payload
+            data=data,
+
+            headers={
+
+                "Content-Type":
+                "application/json"
+            },
+
+            method="POST"
         )
 
-        result = response.json()
+        # send request
+        response = urllib.request.urlopen(req)
+
+        # response data
+        result = json.loads(
+            response.read().decode()
+        )
 
         print(result)
 
@@ -176,12 +194,12 @@ This invite works only once.
 
         return f"ERROR: {str(e)}"
 
-# ---------------- INVITE ROUTE ----------------
+# ---------------- INVITE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    # invalid token
+    # invalid link
     if token not in invite_links:
 
         return "Invalid Invite Link"
@@ -191,12 +209,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire after first use
+    # expire after first click
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # temporary room session
+    # temporary room
     session['invite_room'] = room
 
     # redirect login
@@ -209,14 +227,12 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET JOIN ----------------
+# ---------------- SOCKET ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
-
-# ---------------- REALTIME MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
