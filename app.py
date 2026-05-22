@@ -34,10 +34,13 @@ socketio = SocketIO(
 
 invite_links = {}
 
+# room -> admin user_id
 room_admins = {}
 
+# room -> users
 room_users = {}
 
+# connected socket users
 connected_users = {}
 
 # ---------------- HOME ----------------
@@ -54,7 +57,7 @@ def login():
 
     username = request.form['username']
 
-    # hidden unique id
+    # unique hidden user id
     session['user_id'] = str(uuid.uuid4())
 
     session['username'] = username
@@ -101,12 +104,15 @@ def chat(room):
 
     username = session['username']
 
+    user_id = session['user_id']
+
     # first user becomes admin
     if room not in room_admins:
 
-        room_admins[room] = username
+        room_admins[room] = user_id
 
-    is_admin = room_admins[room] == username
+    # real admin check by user_id
+    is_admin = room_admins[room] == user_id
 
     # invited users cannot invite
     if session.get('is_invited_user'):
@@ -211,8 +217,9 @@ def update_room_users(room):
 
             "username": user['username'],
 
+            # admin check by user_id
             "admin":
-            user['username'] == room_admins.get(room)
+            user['user_id'] == room_admins.get(room)
         })
 
     socketio.emit(
