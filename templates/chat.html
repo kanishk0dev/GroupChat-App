@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Chat</title>
+
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='chat.css') }}">
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+</head>
+
+<body>
+
+<div class="mobile-container" id="container">
+
+    <div class="top-bar">
+
+        <a href="/dashboard">
+
+            <button class="logout-btn">
+                ✖
+            </button>
+
+        </a>
+
+        <button class="invite-btn"
+                onclick="openPopup()">
+            Invite
+        </button>
+
+        <button class="theme-btn"
+                onclick="toggleTheme()"
+                id="theme-btn">
+            🌙
+        </button>
+
+    </div>
+
+    <div id="messages" class="messages"></div>
+
+    <div class="chat-input-area">
+
+        <input type="text"
+               id="message"
+               placeholder="Type message...">
+
+        <button onclick="sendMessage()">
+            Send
+        </button>
+
+    </div>
+
+</div>
+
+<!-- POPUP -->
+
+<div class="popup" id="popup">
+
+    <div class="popup-content">
+
+        <h3>Invite User</h3>
+
+        <input type="email"
+               id="invite-email"
+               placeholder="Enter Email">
+
+        <button onclick="sendInvite()">
+            Send Invite
+        </button>
+
+    </div>
+
+</div>
+
+<script>
+
+var socket = io();
+
+var username = "{{ username }}";
+var room = "{{ room }}";
+
+socket.emit('join', {
+    room: room
+});
+
+socket.on('message', function(data){
+
+    let messages =
+    document.getElementById('messages');
+
+    messages.innerHTML += `
+        <div class="message">
+            <b>${data.username}</b>
+            <p>${data.message}</p>
+        </div>
+    `;
+
+    messages.scrollTop =
+    messages.scrollHeight;
+});
+
+function sendMessage(){
+
+    let input =
+    document.getElementById('message');
+
+    let message = input.value;
+
+    if(message.trim() == ""){
+        return;
+    }
+
+    socket.send({
+        username: username,
+        message: message,
+        room: room
+    });
+
+    input.value = "";
+}
+
+document
+.getElementById("message")
+.addEventListener("keypress", function(e){
+
+    if(e.key === "Enter"){
+        sendMessage();
+    }
+});
+
+function openPopup(){
+
+    document
+    .getElementById("popup")
+    .style.display = "flex";
+}
+
+function sendInvite(){
+
+    let email =
+    document.getElementById("invite-email").value;
+
+    fetch("/send-invite", {
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":
+            "application/x-www-form-urlencoded"
+        },
+
+        body:
+        `email=${email}&room=${room}`
+    })
+
+    .then(res => res.text())
+
+    .then(data => {
+
+        alert(data);
+
+        document
+        .getElementById("popup")
+        .style.display = "none";
+    });
+}
+
+</script>
+
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+
+</body>
+</html>

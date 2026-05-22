@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Dashboard</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='dashboard.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-container" id="container">
+
+    <button class="theme-btn"
+            onclick="toggleTheme()"
+            id="theme-btn">
+        🌙
+    </button>
+
+    <div class="dashboard-content">
+
+        <h2>Welcome {{ username }}</h2>
+
+        <input type="text"
+               id="room-id"
+               placeholder="Enter Room ID">
+
+        <button onclick="generateRoomID()">
+            Generate Room ID
+        </button>
+
+        <button onclick="joinRoom()">
+            Join Room
+        </button>
+
+    </div>
+
+</div>
+
+<script>
+
+function generateRoomID(){
+
+    let chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    let room = "";
+
+    for(let i=0; i<6; i++){
+
+        room += chars.charAt(
+            Math.floor(Math.random() * chars.length)
+        );
+    }
+
+    document.getElementById('room-id').value = room;
+}
+
+function joinRoom(){
+
+    let room =
+    document.getElementById('room-id').value;
+
+    if(room.trim() == ""){
+
+        alert("Enter Room ID");
+        return;
+    }
+
+    window.location.href =
+    "/chat/" + room;
+}
+
+document.addEventListener("keypress", function(e){
+
+    if(e.key === "Enter"){
+        joinRoom();
+    }
+});
+
+</script>
+
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+
+</body>
+</html>
