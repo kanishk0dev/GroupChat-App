@@ -127,7 +127,7 @@ def send_invite():
         payload = {
 
             "from":
-            "onboarding@resend.dev",
+            "groupchatapp1@gmail.com",
 
             "to":
             [email],
