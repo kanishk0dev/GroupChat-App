@@ -1,25 +1,19 @@
 from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
 import uuid
+import os
 import json
 import urllib.request
 import urllib.error
 
-# ---------------- CONFIG ----------------
-
-SECRET_KEY = "your_secret_key"
-
-# Resend API Key
-RESEND_API_KEY = "re_ArmW8zi2_FP4VyPXJBLZL6YX6TRogkQta"
-
-# Your Resend Account Email
-SENDER_EMAIL = "groupchatapp1@gmail.com"
-
-# ---------------- FLASK ----------------
-
 app = Flask(__name__)
 
-app.secret_key = SECRET_KEY
+# ---------------- SECRET KEY ----------------
+
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "secret123"
+)
 
 # ---------------- SOCKET ----------------
 
@@ -48,7 +42,7 @@ def login():
 
     session['username'] = username
 
-    # invite redirect flow
+    # invite flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -108,10 +102,10 @@ def send_invite():
 
         room = request.form['room']
 
-        # unique invite token
+        # generate unique token
         token = str(uuid.uuid4())
 
-        # store invite
+        # save invite
         invite_links[token] = {
 
             "room": room,
@@ -124,10 +118,14 @@ def send_invite():
         # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
+        # resend api key
+        api_key = os.environ.get(
+            "RESEND_API_KEY"
+        )
+
         # email payload
         payload = {
 
-            # KEEP THIS FOR TESTING
             "from":
             "onboarding@resend.dev",
 
@@ -184,7 +182,7 @@ def send_invite():
             headers={
 
                 "Authorization":
-                f"Bearer {RESEND_API_KEY}",
+                f"Bearer {api_key}",
 
                 "Content-Type":
                 "application/json"
@@ -193,15 +191,14 @@ def send_invite():
             method="POST"
         )
 
+        # send request
         try:
 
             response = urllib.request.urlopen(req)
 
             response_data = response.read().decode()
 
-            print("EMAIL SENT")
-
-            print(response_data)
+            print("SUCCESS:", response_data)
 
             return "Invite Sent Successfully!"
 
@@ -215,9 +212,9 @@ def send_invite():
 
     except Exception as e:
 
-        print("EXCEPTION:", e)
+        print("ERROR:", e)
 
-        return f"EXCEPTION: {str(e)}"
+        return f"ERROR: {str(e)}"
 
 # ---------------- INVITE ROUTE ----------------
 
@@ -234,15 +231,15 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link
+    # expire after first use
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room in session
+    # temporary room session
     session['invite_room'] = room
 
-    # redirect login
+    # redirect to login
     return redirect('/')
 
 # ---------------- EMBED ----------------
@@ -270,11 +267,15 @@ def handle_message(data):
 
 if __name__ == '__main__':
 
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
+
     socketio.run(
 
         app,
 
         host='0.0.0.0',
 
-        port=5000
+        port=port
     )
