@@ -20,7 +20,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITES ----------------
+# ---------------- INVITES STORAGE ----------------
 
 invite_links = {}
 
@@ -40,7 +40,7 @@ def login():
 
     session['username'] = username
 
-    # invite flow
+    # invite redirect flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -100,7 +100,7 @@ def send_invite():
 
         room = request.form['room']
 
-        # generate unique token
+        # generate token
         token = str(uuid.uuid4())
 
         # save invite
@@ -110,16 +110,20 @@ def send_invite():
             "used": False
         }
 
+        # base url
         BASE_URL = request.host_url.rstrip('/')
 
+        # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
-        # ---------------- RESEND API ----------------
-
+        # api key
         api_key = os.environ.get(
             "RESEND_API_KEY"
         )
 
+        print("API KEY:", api_key)
+
+        # request headers
         headers = {
 
             "Authorization":
@@ -129,10 +133,11 @@ def send_invite():
             "application/json"
         }
 
+        # email data
         data = {
 
             "from":
-            "Chat App <onboarding@resend.dev>",
+            "onboarding@resend.dev",
 
             "to":
             [email],
@@ -142,14 +147,17 @@ def send_invite():
 
             "html":
             f"""
-            <div style='font-family:Arial;'>
+            <div style="
+                font-family:Arial;
+                padding:20px;
+            ">
 
                 <h2>
-                    Chat Room Invite
+                    You are Invited!
                 </h2>
 
                 <p>
-                    Click below to join:
+                    Click below to join the chat room:
                 </p>
 
                 <a href="{invite_link}"
@@ -157,23 +165,25 @@ def send_invite():
                         background:#2563eb;
                         color:white;
                         padding:12px 20px;
-                        text-decoration:none;
                         border-radius:10px;
+                        text-decoration:none;
                         display:inline-block;
                    ">
-                    Join Chat
+                    Join Chat Room
                 </a>
 
                 <br><br>
 
                 <b>
-                    This invite works only once.
+                    This invite link works
+                    only one time.
                 </b>
 
             </div>
             """
         }
 
+        # resend request
         response = requests.post(
 
             "https://api.resend.com/emails",
@@ -183,28 +193,32 @@ def send_invite():
             json=data
         )
 
-        print(response.text)
+        print("STATUS CODE:", response.status_code)
 
-        if response.status_code == 200:
+        print("RESPONSE:", response.text)
+
+        # success
+        if response.status_code in [200, 201]:
 
             return "Invite Sent Successfully!"
 
+        # failed
         else:
 
-            return "Failed To Send Invite"
+            return f"ERROR: {response.text}"
 
     except Exception as e:
 
-        print(e)
+        print("EXCEPTION:", e)
 
-        return "Error Sending Invite"
+        return f"EXCEPTION: {str(e)}"
 
-# ---------------- INVITE ----------------
+# ---------------- INVITE ROUTE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    # invalid link
+    # invalid token
     if token not in invite_links:
 
         return "Invalid Invite Link"
@@ -214,15 +228,15 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link
+    # expire after first click
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room temporarily
+    # temporary session storage
     session['invite_room'] = room
 
-    # redirect login
+    # redirect to login
     return redirect('/')
 
 # ---------------- EMBED ----------------
@@ -232,12 +246,14 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET ----------------
+# ---------------- SOCKET JOIN ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
+
+# ---------------- REALTIME MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
@@ -248,10 +264,15 @@ def handle_message(data):
 
 if __name__ == '__main__':
 
-    port = int(os.environ.get("PORT", 5000))
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
 
     socketio.run(
+
         app,
+
         host='0.0.0.0',
+
         port=port
     )
