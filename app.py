@@ -19,9 +19,11 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITE STORAGE ----------------
+# ---------------- STORAGE ----------------
 
 invite_links = {}
+
+room_admins = {}
 
 # ---------------- HOME ----------------
 
@@ -39,14 +41,20 @@ def login():
 
     session['username'] = username
 
-    # invite redirect flow
+    # invited user flow
     if 'invite_room' in session:
 
         room = session['invite_room']
 
         session.pop('invite_room', None)
 
+        # invited users cannot invite others
+        session['is_invited_user'] = True
+
         return redirect(f'/chat/{room}')
+
+    # normal dashboard login
+    session['is_invited_user'] = False
 
     return redirect('/dashboard')
 
@@ -73,10 +81,30 @@ def chat(room):
 
         return redirect('/')
 
+    username = session['username']
+
+    # set admin if room created first time
+    if room not in room_admins:
+
+        room_admins[room] = username
+
+    # check admin
+    is_admin = room_admins[room] == username
+
+    # invited users never admin
+    if session.get('is_invited_user'):
+
+        is_admin = False
+
     return render_template(
+
         'chat.html',
-        username=session['username'],
-        room=room
+
+        username=username,
+
+        room=room,
+
+        is_admin=is_admin
     )
 
 # ---------------- LOGOUT ----------------
@@ -92,6 +120,15 @@ def logout():
 
 @app.route('/generate-invite', methods=['POST'])
 def generate_invite():
+
+    # only admin can invite
+    if session.get('is_invited_user'):
+
+        return jsonify({
+
+            "error":
+            "You are not allowed to invite users"
+        })
 
     room = request.form['room']
 

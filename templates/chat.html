@@ -30,12 +30,23 @@
 
         </a>
 
-        <!-- INVITE -->
+        <!-- INVITE BUTTON -->
+
+        {% if is_admin %}
 
         <button class="invite-btn"
                 onclick="openPopup()">
             Invite
         </button>
+
+        {% else %}
+
+        <button class="invite-btn disabled-btn"
+                disabled>
+            Invite Disabled
+        </button>
+
+        {% endif %}
 
         <!-- THEME -->
 
@@ -51,7 +62,7 @@
 
     <div id="messages" class="messages"></div>
 
-    <!-- INPUT AREA -->
+    <!-- CHAT INPUT -->
 
     <div class="chat-input-area">
 
@@ -221,7 +232,7 @@ function copyInviteLink(){
 
     alert("Invite Link Copied!");
 
-    // close popup after copy
+    // close popup
 
     document
     .getElementById("popup")
