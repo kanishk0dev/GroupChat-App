@@ -42,19 +42,11 @@
 
         <div class="left-section">
 
-            <!-- BACK -->
-
             <a href="/dashboard">
 
-                <button class="logout-btn">
-
-                    ✖
-
-                </button>
+                <button class="logout-btn">✖</button>
 
             </a>
-
-            <!-- INVITE -->
 
             {% if is_admin %}
 
@@ -71,20 +63,12 @@
 
         <div class="right-section">
 
-            <!-- USERS -->
-
             <button class="users-btn"
                     onclick="openUsersPopup()">
 
-                👥
-
-                <span id="user-count">
-                    1
-                </span>
+                👥 <span id="user-count">1</span>
 
             </button>
-
-            <!-- THEME -->
 
             <button class="theme-btn"
                     onclick="toggleTheme()"
@@ -100,8 +84,7 @@
 
     <!-- CHAT -->
 
-    <div id="messages"
-         class="messages"></div>
+    <div id="messages" class="messages"></div>
 
     <!-- INPUT -->
 
@@ -111,11 +94,7 @@
                id="message"
                placeholder="Write a message...">
 
-        <button onclick="sendMessage()">
-
-            Send
-
-        </button>
+        <button onclick="sendMessage()">Send</button>
 
     </div>
 
@@ -123,42 +102,31 @@
 
 <!-- INVITE POPUP -->
 
-<div class="popup"
-     id="popup">
+<div class="popup" id="popup">
 
     <div class="popup-content">
 
-        <h3>
-            Invite Link
-        </h3>
+        <h3>Invite Link</h3>
 
         <input type="text"
                id="invite-link"
                readonly
-               placeholder="Generating link...">
+               placeholder="Generating...">
 
         <button onclick="copyInviteLink()"
-                id="copy-btn">
+                id="copy-btn"
+                disabled>
 
             Copy Link
 
         </button>
 
         <div id="copy-success">
-
-            Link Copied Successfully
-
+            ✓ Link Copied!
         </div>
 
-        <div id="invite-error"
-             style="color:#f87171;
-                    font-size:12px;
-                    display:none;
-                    text-align:center;
-                    font-weight:600;">
-
-            Failed to generate link. Try again.
-
+        <div id="invite-error">
+            ✕ Failed to generate. Try closing and reopening.
         </div>
 
     </div>
@@ -167,14 +135,11 @@
 
 <!-- USERS POPUP -->
 
-<div class="popup"
-     id="users-popup">
+<div class="popup" id="users-popup">
 
     <div class="popup-content">
 
-        <h3>
-            Users In Chat
-        </h3>
+        <h3>Users In Chat</h3>
 
         <div id="users-list"></div>
 
@@ -187,400 +152,239 @@
 // ---------------- SOCKET ----------------
 
 var socket = io({
-
     transports: ["polling", "websocket"]
 });
-
 
 // ---------------- USER INFO ----------------
 
 var username = "{{ username }}";
-
-var room = "{{ room }}";
-
-var user_id = "{{ session['user_id'] }}";
-
+var room     = "{{ room }}";
+var user_id  = "{{ session['user_id'] }}";
 
 // ---------------- JOIN ----------------
 
 socket.emit('join', {
-
-    room: room,
-
+    room:     room,
     username: username,
-
-    user_id: user_id
+    user_id:  user_id
 });
-
 
 // ---------------- RECEIVE MESSAGE ----------------
 
 socket.on('message', function(data){
 
-    let messages =
-    document.getElementById('messages');
+    let messages  = document.getElementById('messages');
+    let isMine    = data.user_id === user_id;
+    let msgClass  = isMine ? "my-message" : "other-message";
 
-    let isMine =
-    data.user_id === user_id;
+    let nameHTML  = isMine
+        ? ""
+        : `<div class="sender-name">${data.username}</div>`;
 
-    let messageClass =
-    isMine ? "my-message" : "other-message";
-
-    let nameHTML =
-    isMine
-    ? ""
-    : `<div class="sender-name">${data.username}</div>`;
-
-    let deleteButton =
-    isMine
-    ? `<button class="delete-btn"
-               onclick="deleteMessage('${data.id}')">🗑️</button>`
-    : "";
+    let deleteBtn = isMine
+        ? `<button class="delete-btn"
+                   onclick="deleteMessage('${data.id}')">🗑️</button>`
+        : "";
 
     messages.innerHTML += `
-
-        <div class="message-wrapper ${messageClass}"
-             id="${data.id}">
-
+        <div class="message-wrapper ${msgClass}" id="${data.id}">
             ${nameHTML}
-
             <div class="message">
-
                 <div class="message-text">${data.message}</div>
-
                 <div class="message-time">${data.time}</div>
-
-                ${deleteButton}
-
+                ${deleteBtn}
             </div>
-
         </div>
     `;
 
-    messages.scrollTop =
-    messages.scrollHeight;
+    messages.scrollTop = messages.scrollHeight;
 });
-
 
 // ---------------- USER STATUS ----------------
 
 socket.on('user_status', function(data){
 
-    let messages =
-    document.getElementById('messages');
+    let messages = document.getElementById('messages');
 
     messages.innerHTML += `
-
-        <div class="status-message">
-
-            ${data.message}
-
-        </div>
+        <div class="status-message">${data.message}</div>
     `;
 
-    messages.scrollTop =
-    messages.scrollHeight;
+    messages.scrollTop = messages.scrollHeight;
 });
-
 
 // ---------------- SEND MESSAGE ----------------
 
 function sendMessage(){
 
-    let input =
-    document.getElementById('message');
+    let input   = document.getElementById('message');
+    let message = input.value.trim();
 
-    let message =
-    input.value.trim();
+    if(message === "") return;
 
-    if(message === ""){
-
-        return;
-    }
-
-    const currentTime =
-    new Date().toLocaleTimeString([], {
-
-        hour: '2-digit',
-
+    const currentTime = new Date().toLocaleTimeString([], {
+        hour:   '2-digit',
         minute: '2-digit'
     });
 
     socket.emit('message', {
-
-        id: crypto.randomUUID(),
-
-        user_id: user_id,
-
+        id:       crypto.randomUUID(),
+        user_id:  user_id,
         username: username,
-
-        message: message,
-
-        time: currentTime,
-
-        room: room
+        message:  message,
+        time:     currentTime,
+        room:     room
     });
 
     input.value = "";
 }
 
-
 // ---------------- DELETE ----------------
 
 function deleteMessage(id){
-
-    socket.emit('delete_message', {
-
-        id: id,
-
-        room: room
-    });
+    socket.emit('delete_message', { id: id, room: room });
 }
 
-
-// ---------------- RECEIVE DELETE ----------------
-
 socket.on('delete_message', function(data){
-
-    let msg =
-    document.getElementById(data.id);
-
-    if(msg){
-
-        msg.remove();
-    }
+    let msg = document.getElementById(data.id);
+    if(msg) msg.remove();
 });
-
 
 // ---------------- UPDATE USERS ----------------
 
 socket.on('update_users', function(data){
 
-    document
-    .getElementById("user-count")
-    .innerText = data.count;
+    document.getElementById("user-count").innerText = data.count;
 
-    let usersList =
-    document.getElementById("users-list");
-
+    let usersList = document.getElementById("users-list");
     usersList.innerHTML = "";
 
     data.users.forEach(user => {
 
-        let div =
-        document.createElement("div");
-
+        let div = document.createElement("div");
         div.classList.add("user-item");
 
-        if(user.admin){
-
-            div.innerHTML = `
-                ${user.username}
-                <span class="admin-tag">Admin</span>
-            `;
-        }
-
-        else{
-
-            div.innerHTML = user.username;
-        }
+        div.innerHTML = user.admin
+            ? `${user.username}<span class="admin-tag">Admin</span>`
+            : user.username;
 
         usersList.appendChild(div);
     });
 });
 
-
 // ---------------- ENTER KEY ----------------
 
-document
-.getElementById("message")
+document.getElementById("message")
 .addEventListener("keypress", function(e){
-
-    if(e.key === "Enter"){
-
-        sendMessage();
-    }
+    if(e.key === "Enter") sendMessage();
 });
 
+// ---------------- INVITE HELPERS ----------------
+
+function setInviteLoading(){
+    document.getElementById("invite-link").value = "";
+    document.getElementById("invite-link").placeholder = "Generating...";
+    document.getElementById("copy-btn").disabled = true;
+    document.getElementById("copy-btn").style.opacity = "0.5";
+    document.getElementById("copy-success").style.display = "none";
+    document.getElementById("invite-error").style.display = "none";
+}
+
+function setInviteSuccess(link){
+    document.getElementById("invite-link").value = link;
+    document.getElementById("invite-link").placeholder = "";
+    document.getElementById("copy-btn").disabled = false;
+    document.getElementById("copy-btn").style.opacity = "1";
+    document.getElementById("invite-error").style.display = "none";
+}
+
+function setInviteError(){
+    document.getElementById("invite-link").value = "";
+    document.getElementById("invite-link").placeholder = "Could not generate link";
+    document.getElementById("copy-btn").disabled = true;
+    document.getElementById("copy-btn").style.opacity = "0.5";
+    document.getElementById("invite-error").style.display = "block";
+}
 
 // ---------------- OPEN INVITE ----------------
 
 function openPopup(){
 
-    // show popup immediately
-    document
-    .getElementById("popup")
-    .style.display = "flex";
+    document.getElementById("popup").style.display = "flex";
 
-    // reset state every time popup opens
-    let linkInput =
-    document.getElementById("invite-link");
-
-    let copyBtn =
-    document.getElementById("copy-btn");
-
-    let errorDiv =
-    document.getElementById("invite-error");
-
-    let successDiv =
-    document.getElementById("copy-success");
-
-    linkInput.value = "";
-
-    linkInput.placeholder = "Generating link...";
-
-    copyBtn.disabled = true;
-
-    copyBtn.style.opacity = "0.5";
-
-    errorDiv.style.display = "none";
-
-    successDiv.style.display = "none";
-
-    // FIX: always fetch a fresh link on every open
-    // with proper error handling so undefined never shows
+    setInviteLoading();
 
     fetch("/generate-invite", {
-
-        method: "POST",
-
-        headers:{
-            "Content-Type":
-            "application/x-www-form-urlencoded"
+        method:      "POST",
+        credentials: "same-origin",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
         },
-
-        body: `room=${encodeURIComponent(room)}`
+        body: "room=" + encodeURIComponent(room)
     })
-
     .then(function(res){
+        // parse JSON regardless of status code
+        return res.json().then(function(data){
+            return { status: res.status, data: data };
+        });
+    })
+    .then(function(result){
 
-        if(!res.ok){
-
-            throw new Error(
-                "Server error: " + res.status
-            );
+        if(result.status !== 200 || result.data.error || !result.data.link){
+            console.error("Invite error:", result.data.error || "No link");
+            setInviteError();
+            return;
         }
 
-        return res.json();
+        setInviteSuccess(result.data.link);
     })
-
-    .then(function(data){
-
-        // FIX: guard against missing or error response
-        if(!data.link || data.error){
-
-            throw new Error(
-                data.error || "No link returned"
-            );
-        }
-
-        linkInput.value = data.link;
-
-        linkInput.placeholder = "";
-
-        copyBtn.disabled = false;
-
-        copyBtn.style.opacity = "1";
-    })
-
     .catch(function(err){
-
-        // FIX: show error message instead of "undefined"
-        linkInput.value = "";
-
-        linkInput.placeholder = "Failed to generate link";
-
-        errorDiv.style.display = "block";
-
-        copyBtn.disabled = true;
-
-        copyBtn.style.opacity = "0.5";
-
-        console.error("Invite error:", err);
+        console.error("Fetch failed:", err);
+        setInviteError();
     });
 }
-
 
 // ---------------- COPY LINK ----------------
 
 function copyInviteLink(){
 
-    let input =
-    document.getElementById("invite-link");
+    let input = document.getElementById("invite-link");
 
-    // guard: don't copy if empty or placeholder
-    if(!input.value || input.value.trim() === ""){
+    if(!input.value.trim()) return;
 
-        return;
-    }
-
-    input.select();
-
-    navigator.clipboard
-    .writeText(input.value)
+    navigator.clipboard.writeText(input.value)
     .then(function(){
-
-        document
-        .getElementById("copy-success")
-        .style.display = "block";
-
-        setTimeout(() => {
-
-            document
-            .getElementById("copy-success")
-            .style.display = "none";
-
-        }, 2000);
+        showCopied();
     })
     .catch(function(){
-
-        // fallback for older browsers
+        // fallback
+        input.select();
         document.execCommand("copy");
-
-        document
-        .getElementById("copy-success")
-        .style.display = "block";
-
-        setTimeout(() => {
-
-            document
-            .getElementById("copy-success")
-            .style.display = "none";
-
-        }, 2000);
+        showCopied();
     });
 }
 
+function showCopied(){
+    let s = document.getElementById("copy-success");
+    s.style.display = "block";
+    setTimeout(function(){ s.style.display = "none"; }, 2000);
+}
 
 // ---------------- USERS POPUP ----------------
 
 function openUsersPopup(){
-
-    document
-    .getElementById("users-popup")
-    .style.display = "flex";
+    document.getElementById("users-popup").style.display = "flex";
 }
-
 
 // ---------------- CLOSE POPUPS ----------------
 
 window.onclick = function(e){
 
-    let popup =
-    document.getElementById("popup");
+    let popup      = document.getElementById("popup");
+    let usersPopup = document.getElementById("users-popup");
 
-    let usersPopup =
-    document.getElementById("users-popup");
-
-    if(e.target == popup){
-
-        popup.style.display = "none";
-    }
-
-    if(e.target == usersPopup){
-
-        usersPopup.style.display = "none";
-    }
+    if(e.target === popup)      popup.style.display      = "none";
+    if(e.target === usersPopup) usersPopup.style.display = "none";
 };
 
 </script>
