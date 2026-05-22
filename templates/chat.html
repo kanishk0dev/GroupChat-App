@@ -3,7 +3,7 @@
 
 <head>
 
-    <title>Realtime Chat</title>
+    <title>GroupChat</title>
 
     <!-- PREVENT THEME FLICKER -->
 
@@ -213,24 +213,23 @@ socket.on('message', function(data){
     let messageClass =
     isMine ? "my-message" : "other-message";
 
+    /* sender name — only for others */
+
     let nameHTML =
     isMine
     ? ""
-    : `<div class="sender-name">
-            ${data.username}
-       </div>`;
+    : `<div class="sender-name">${data.username}</div>`;
+
+    /* delete button — only for mine */
 
     let deleteButton =
     isMine
-    ? `
-    <button class="delete-btn"
-            onclick="deleteMessage('${data.id}')">
-
-        🗑️
-
-    </button>
-    `
+    ? `<button class="delete-btn"
+               onclick="deleteMessage('${data.id}')">🗑️</button>`
     : "";
+
+    /* FIX: delete btn now sits outside .message,
+       as a sibling so it doesn't push text content */
 
     messages.innerHTML += `
 
@@ -241,19 +240,11 @@ socket.on('message', function(data){
 
             <div class="message">
 
+                <div class="message-text">${data.message}</div>
+
+                <div class="message-time">${data.time}</div>
+
                 ${deleteButton}
-
-                <div class="message-text">
-
-                    ${data.message}
-
-                </div>
-
-                <div class="message-time">
-
-                    ${data.time}
-
-                </div>
 
             </div>
 
