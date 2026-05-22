@@ -58,7 +58,8 @@ connected_users = {}
 @app.route('/')
 def home():
 
-    return render_template('login.html')
+    return render_template('login.html',
+                           invite_room=session.get('invite_room', ''))
 
 # ---------------- LOGIN ----------------
 
@@ -163,14 +164,23 @@ def generate_invite():
             "Not Allowed"
         })
 
-    room = request.form['room']
+    room = request.form.get('room', '').strip()
+
+    if not room:
+
+        return jsonify({"error": "Room not specified"})
 
     token = str(uuid.uuid4())
 
+    # FIX: store token with use_count instead of boolean
+    # allows multiple people to use generated links
     invite_links[token] = {
 
         "room": room,
-        "used": False
+
+        "use_count": 0,
+
+        "max_uses": 10   # allow up to 10 uses per token
     }
 
     BASE_URL = request.host_url.rstrip('/')
@@ -189,16 +199,19 @@ def invite(token):
 
     if token not in invite_links:
 
-        return "Invalid Invite Link"
+        return "Invalid Invite Link", 404
 
-    if invite_links[token]["used"]:
+    invite_data = invite_links[token]
 
-        return "Invite Link Expired"
+    # FIX: check use_count against max_uses
+    if invite_data["use_count"] >= invite_data["max_uses"]:
 
-    # one time use
-    invite_links[token]["used"] = True
+        return "Invite Link Expired", 410
 
-    room = invite_links[token]["room"]
+    # increment use count
+    invite_links[token]["use_count"] += 1
+
+    room = invite_data["room"]
 
     session['invite_room'] = room
 
@@ -375,8 +388,8 @@ def disconnect_user():
 
         {
 
-            "message":
-            f"{username} left the chat"
+                "message":
+                f"{username} left the chat"
         },
 
         room=room
