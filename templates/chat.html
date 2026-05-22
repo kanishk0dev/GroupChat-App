@@ -134,9 +134,11 @@
 
         <input type="text"
                id="invite-link"
-               readonly>
+               readonly
+               placeholder="Generating link...">
 
-        <button onclick="copyInviteLink()">
+        <button onclick="copyInviteLink()"
+                id="copy-btn">
 
             Copy Link
 
@@ -145,6 +147,17 @@
         <div id="copy-success">
 
             Link Copied Successfully
+
+        </div>
+
+        <div id="invite-error"
+             style="color:#f87171;
+                    font-size:12px;
+                    display:none;
+                    text-align:center;
+                    font-weight:600;">
+
+            Failed to generate link. Try again.
 
         </div>
 
@@ -213,23 +226,16 @@ socket.on('message', function(data){
     let messageClass =
     isMine ? "my-message" : "other-message";
 
-    /* sender name — only for others */
-
     let nameHTML =
     isMine
     ? ""
     : `<div class="sender-name">${data.username}</div>`;
-
-    /* delete button — only for mine */
 
     let deleteButton =
     isMine
     ? `<button class="delete-btn"
                onclick="deleteMessage('${data.id}')">🗑️</button>`
     : "";
-
-    /* FIX: delete btn now sits outside .message,
-       as a sibling so it doesn't push text content */
 
     messages.innerHTML += `
 
@@ -325,9 +331,9 @@ function deleteMessage(id){
 
     socket.emit('delete_message', {
 
-        id:id,
+        id: id,
 
-        room:room
+        room: room
     });
 }
 
@@ -370,19 +376,13 @@ socket.on('update_users', function(data){
 
             div.innerHTML = `
                 ${user.username}
-
-                <span class="admin-tag">
-
-                    Admin
-
-                </span>
+                <span class="admin-tag">Admin</span>
             `;
         }
 
         else{
 
-            div.innerHTML =
-            user.username;
+            div.innerHTML = user.username;
         }
 
         usersList.appendChild(div);
@@ -407,29 +407,96 @@ document
 
 function openPopup(){
 
+    // show popup immediately
     document
     .getElementById("popup")
     .style.display = "flex";
 
+    // reset state every time popup opens
+    let linkInput =
+    document.getElementById("invite-link");
+
+    let copyBtn =
+    document.getElementById("copy-btn");
+
+    let errorDiv =
+    document.getElementById("invite-error");
+
+    let successDiv =
+    document.getElementById("copy-success");
+
+    linkInput.value = "";
+
+    linkInput.placeholder = "Generating link...";
+
+    copyBtn.disabled = true;
+
+    copyBtn.style.opacity = "0.5";
+
+    errorDiv.style.display = "none";
+
+    successDiv.style.display = "none";
+
+    // FIX: always fetch a fresh link on every open
+    // with proper error handling so undefined never shows
+
     fetch("/generate-invite", {
 
-        method:"POST",
+        method: "POST",
 
         headers:{
             "Content-Type":
             "application/x-www-form-urlencoded"
         },
 
-        body:`room=${room}`
+        body: `room=${encodeURIComponent(room)}`
     })
 
-    .then(res => res.json())
+    .then(function(res){
 
-    .then(data => {
+        if(!res.ok){
 
-        document
-        .getElementById("invite-link")
-        .value = data.link;
+            throw new Error(
+                "Server error: " + res.status
+            );
+        }
+
+        return res.json();
+    })
+
+    .then(function(data){
+
+        // FIX: guard against missing or error response
+        if(!data.link || data.error){
+
+            throw new Error(
+                data.error || "No link returned"
+            );
+        }
+
+        linkInput.value = data.link;
+
+        linkInput.placeholder = "";
+
+        copyBtn.disabled = false;
+
+        copyBtn.style.opacity = "1";
+    })
+
+    .catch(function(err){
+
+        // FIX: show error message instead of "undefined"
+        linkInput.value = "";
+
+        linkInput.placeholder = "Failed to generate link";
+
+        errorDiv.style.display = "block";
+
+        copyBtn.disabled = true;
+
+        copyBtn.style.opacity = "0.5";
+
+        console.error("Invite error:", err);
     });
 }
 
@@ -441,23 +508,47 @@ function copyInviteLink(){
     let input =
     document.getElementById("invite-link");
 
+    // guard: don't copy if empty or placeholder
+    if(!input.value || input.value.trim() === ""){
+
+        return;
+    }
+
     input.select();
 
-    navigator.clipboard.writeText(
-        input.value
-    );
-
-    document
-    .getElementById("copy-success")
-    .style.display = "block";
-
-    setTimeout(() => {
+    navigator.clipboard
+    .writeText(input.value)
+    .then(function(){
 
         document
         .getElementById("copy-success")
-        .style.display = "none";
+        .style.display = "block";
 
-    }, 2000);
+        setTimeout(() => {
+
+            document
+            .getElementById("copy-success")
+            .style.display = "none";
+
+        }, 2000);
+    })
+    .catch(function(){
+
+        // fallback for older browsers
+        document.execCommand("copy");
+
+        document
+        .getElementById("copy-success")
+        .style.display = "block";
+
+        setTimeout(() => {
+
+            document
+            .getElementById("copy-success")
+            .style.display = "none";
+
+        }, 2000);
+    });
 }
 
 
