@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
 import uuid
 import os
-import requests
+import json
+import urllib.request
 
 app = Flask(__name__)
 
@@ -20,7 +21,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITES STORAGE ----------------
+# ---------------- INVITE STORAGE ----------------
 
 invite_links = {}
 
@@ -40,7 +41,7 @@ def login():
 
     session['username'] = username
 
-    # invite redirect flow
+    # invite flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -100,7 +101,7 @@ def send_invite():
 
         room = request.form['room']
 
-        # generate token
+        # generate unique token
         token = str(uuid.uuid4())
 
         # save invite
@@ -116,25 +117,13 @@ def send_invite():
         # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
-        # api key
+        # resend api key
         api_key = os.environ.get(
             "RESEND_API_KEY"
         )
 
-        print("API KEY:", api_key)
-
-        # request headers
-        headers = {
-
-            "Authorization":
-            f"Bearer {api_key}",
-
-            "Content-Type":
-            "application/json"
-        }
-
-        # email data
-        data = {
+        # email payload
+        payload = {
 
             "from":
             "onboarding@resend.dev",
@@ -147,13 +136,10 @@ def send_invite():
 
             "html":
             f"""
-            <div style="
-                font-family:Arial;
-                padding:20px;
-            ">
+            <div style='font-family:Arial;padding:20px;'>
 
                 <h2>
-                    You are Invited!
+                    You are invited!
                 </h2>
 
                 <p>
@@ -175,43 +161,47 @@ def send_invite():
                 <br><br>
 
                 <b>
-                    This invite link works
-                    only one time.
+                    This invite link works only once.
                 </b>
 
             </div>
             """
         }
 
-        # resend request
-        response = requests.post(
+        # convert to json
+        data = json.dumps(payload).encode("utf-8")
+
+        # api request
+        req = urllib.request.Request(
 
             "https://api.resend.com/emails",
 
-            headers=headers,
+            data=data,
 
-            json=data
+            headers={
+
+                "Authorization":
+                f"Bearer {api_key}",
+
+                "Content-Type":
+                "application/json"
+            },
+
+            method="POST"
         )
 
-        print("STATUS CODE:", response.status_code)
+        # send request
+        response = urllib.request.urlopen(req)
 
-        print("RESPONSE:", response.text)
+        print("EMAIL SENT")
 
-        # success
-        if response.status_code in [200, 201]:
-
-            return "Invite Sent Successfully!"
-
-        # failed
-        else:
-
-            return f"ERROR: {response.text}"
+        return "Invite Sent Successfully!"
 
     except Exception as e:
 
-        print("EXCEPTION:", e)
+        print("ERROR:", e)
 
-        return f"EXCEPTION: {str(e)}"
+        return f"ERROR: {str(e)}"
 
 # ---------------- INVITE ROUTE ----------------
 
@@ -228,12 +218,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire after first click
+    # expire after first use
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # temporary session storage
+    # temporary session room
     session['invite_room'] = room
 
     # redirect to login
