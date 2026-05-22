@@ -3,7 +3,7 @@
 
 <head>
 
-    <title>Login</title>
+    <title>GroupChat</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='login.css') }}">
@@ -15,7 +15,7 @@
 <div class="mobile-container"
      id="container">
 
-    <!-- THEME BUTTON -->
+    <!-- THEME -->
 
     <button class="theme-btn"
             id="theme-btn"
@@ -25,12 +25,12 @@
 
     </button>
 
-    <!-- LOGIN BOX -->
+    <!-- LOGIN -->
 
     <div class="login-box">
 
         <h1>
-            Welcome Back
+            WELCOME
         </h1>
 
         <p>
@@ -40,21 +40,11 @@
         <form action="/login"
               method="POST">
 
-            <!-- USERNAME -->
-
             <input type="text"
                    name="username"
                    id="username"
                    placeholder="Enter your name"
                    required>
-
-            <!-- INVITE ROOM -->
-
-            <input type="hidden"
-                   name="invite_room"
-                   value="{{ invite_room }}">
-
-            <!-- BUTTON -->
 
             <button type="submit">
 
@@ -69,8 +59,6 @@
 </div>
 
 <script>
-
-// ---------------- ENTER KEY ----------------
 
 document
 .getElementById("username")

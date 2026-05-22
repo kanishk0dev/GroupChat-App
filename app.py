@@ -58,14 +58,7 @@ connected_users = {}
 @app.route('/')
 def home():
 
-    invite_room = request.args.get('invite_room')
-
-    return render_template(
-
-        'login.html',
-
-        invite_room=invite_room
-    )
+    return render_template('login.html')
 
 # ---------------- LOGIN ----------------
 
@@ -74,20 +67,21 @@ def login():
 
     username = request.form['username']
 
-    invite_room = request.form.get('invite_room')
-
     # hidden unique user id
     session['user_id'] = str(uuid.uuid4())
 
     session['username'] = username
 
-    # iframe-safe invite flow
+    # invite flow
+    if 'invite_room' in session:
 
-    if invite_room:
+        room = session['invite_room']
+
+        session.pop('invite_room', None)
 
         session['is_invited_user'] = True
 
-        return redirect(f'/chat/{invite_room}')
+        return redirect(f'/chat/{room}')
 
     session['is_invited_user'] = False
 
@@ -127,7 +121,7 @@ def chat(room):
 
         room_admins[room] = user_id
 
-    # real admin check
+    # real admin check by user_id
     is_admin = room_admins[room] == user_id
 
     # invited users cannot invite
@@ -206,8 +200,9 @@ def invite(token):
 
     room = invite_links[token]["room"]
 
-    # iframe-safe redirect
-    return redirect(f"/?invite_room={room}")
+    session['invite_room'] = room
+
+    return redirect('/')
 
 # ---------------- EMBED ----------------
 
@@ -232,6 +227,7 @@ def update_room_users(room):
 
             "username": user['username'],
 
+            # admin check by user_id
             "admin":
             user['user_id'] == room_admins.get(room)
         })
@@ -276,7 +272,7 @@ def handle_join(data):
 
         room_users[room] = []
 
-    # unique user
+    # unique by user_id
     user_exists = False
 
     for user in room_users[room]:
