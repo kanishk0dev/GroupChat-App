@@ -33,7 +33,7 @@ socketio = SocketIO(
 
 # ---------------- STORAGE ----------------
 
-# room -> single permanent token (never expires)
+# room -> set of active tokens
 room_invite_tokens = {}
 
 # token -> room (reverse lookup)
@@ -72,6 +72,14 @@ def login():
 
     if 'invite_room' in session:
         room = session.pop('invite_room')
+
+        # burn only this specific token, leave others alive
+        token = session.pop('invite_token', None)
+        if token:
+            token_to_room.pop(token, None)
+            if room in room_invite_tokens:
+                room_invite_tokens[room].discard(token)
+
         session['is_invited_user'] = True
         return redirect(f'/chat/{room}')
 
@@ -102,7 +110,6 @@ def chat(room):
     # first person into the room becomes admin
     if room not in room_admins:
         room_admins[room] = user_id
-        # creator is never an invited user
         session['is_invited_user'] = False
 
     is_admin = (room_admins[room] == user_id)
@@ -123,11 +130,9 @@ def chat(room):
 @app.route('/generate-invite', methods=['POST'])
 def generate_invite():
 
-    # must be logged in
     if 'user_id' not in session:
         return jsonify({"error": "Not logged in"}), 401
 
-    # invited users cannot generate links
     if session.get('is_invited_user') is True:
         return jsonify({"error": "Not allowed"}), 403
 
@@ -135,18 +140,18 @@ def generate_invite():
     if not room:
         return jsonify({"error": "Room not specified"}), 400
 
-    # FIX: only the admin of this room can generate a link
     user_id = session['user_id']
     if room in room_admins and room_admins[room] != user_id:
         return jsonify({"error": "Not the admin"}), 403
 
-    # reuse existing token for this room, or create one
+    # always generate a fresh token and add it to the pool
+    token = str(uuid.uuid4())
+
     if room not in room_invite_tokens:
-        token = str(uuid.uuid4())
-        room_invite_tokens[room] = token
-        token_to_room[token] = room
-    else:
-        token = room_invite_tokens[room]
+        room_invite_tokens[room] = set()
+
+    room_invite_tokens[room].add(token)
+    token_to_room[token] = room
 
     BASE_URL = request.host_url.rstrip('/')
     invite_link = f"{BASE_URL}/invite/{token}"
@@ -158,13 +163,13 @@ def generate_invite():
 @app.route('/invite/<token>')
 def invite(token):
 
-    # FIX: use reverse lookup dict — O(1), no loop
     room = token_to_room.get(token)
 
     if not room:
-        return "Invalid invite link.", 404
+        return "Invalid or already used invite link.", 404
 
     session['invite_room'] = room
+    session['invite_token'] = token  # stored so login can burn it
     return redirect('/')
 
 # ---------------- EMBED ----------------
