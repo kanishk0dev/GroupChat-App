@@ -3,7 +3,26 @@
 
 <head>
 
-    <title>GroupChat</title>
+    <title>Realtime Chat</title>
+
+    <!-- PREVENT THEME FLICKER -->
+
+    <script>
+
+    (function(){
+
+        const savedTheme =
+        localStorage.getItem("theme");
+
+        if(savedTheme === "dark"){
+
+            document.documentElement
+            .classList.add("dark-theme");
+        }
+
+    })();
+
+    </script>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='chat.css') }}">
@@ -191,14 +210,6 @@ socket.on('message', function(data){
     let isMine =
     data.user_id === user_id;
 
-    let currentTime =
-    new Date().toLocaleTimeString([], {
-
-        hour: '2-digit',
-
-        minute: '2-digit'
-    });
-
     let messageClass =
     isMine ? "my-message" : "other-message";
 
@@ -240,7 +251,7 @@ socket.on('message', function(data){
 
                 <div class="message-time">
 
-                    ${currentTime}
+                    ${data.time}
 
                 </div>
 
@@ -283,12 +294,20 @@ function sendMessage(){
     document.getElementById('message');
 
     let message =
-    input.value;
+    input.value.trim();
 
-    if(message.trim() == ""){
+    if(message === ""){
 
         return;
     }
+
+    const currentTime =
+    new Date().toLocaleTimeString([], {
+
+        hour: '2-digit',
+
+        minute: '2-digit'
+    });
 
     socket.emit('message', {
 
@@ -299,6 +318,8 @@ function sendMessage(){
         username: username,
 
         message: message,
+
+        time: currentTime,
 
         room: room
     });

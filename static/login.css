@@ -44,26 +44,28 @@ body{
     justify-content:center;
 
     align-items:center;
+
+    overflow:hidden;
 }
 
 
 /* ---------------- DARK THEME ---------------- */
 
-.dark-theme{
+html.dark-theme .mobile-container{
 
     background:#0f172a !important;
 
     color:white;
 }
 
-.dark-theme .login-box input{
+html.dark-theme .login-box input{
 
     background:#1e293b;
 
     color:white;
 }
 
-.dark-theme .login-box p{
+html.dark-theme .login-box p{
 
     color:#cbd5e1;
 }
@@ -149,6 +151,8 @@ body{
     font-size:15px;
 
     text-align:center;
+
+    transition:0.3s;
 }
 
 

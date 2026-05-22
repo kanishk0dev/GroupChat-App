@@ -3,7 +3,26 @@
 
 <head>
 
-    <title>GroupChat</title>
+    <title>Dashboard</title>
+
+    <!-- PREVENT THEME FLICKER -->
+
+    <script>
+
+    (function(){
+
+        const savedTheme =
+        localStorage.getItem("theme");
+
+        if(savedTheme === "dark"){
+
+            document.documentElement
+            .classList.add("dark-theme");
+        }
+
+    })();
+
+    </script>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='dashboard.css') }}">
@@ -15,7 +34,7 @@
 <div class="mobile-container"
      id="container">
 
-    <!-- THEME -->
+    <!-- THEME BUTTON -->
 
     <button class="theme-btn"
             id="theme-btn"
@@ -30,19 +49,28 @@
     <div class="dashboard-box">
 
         <h1>
-            Hello {{ username }}
+            Chat Dashboard
         </h1>
 
+        <p>
+            Create a room or join an existing one
+        </p>
+
+        <!-- ROOM INPUT -->
 
         <input type="text"
                id="room-id"
                placeholder="Enter Room ID">
 
-        <button onclick="generateRoomId()">
+        <!-- GENERATE -->
+
+        <button onclick="generateRoom()">
 
             Generate Room ID
 
         </button>
+
+        <!-- JOIN -->
 
         <button onclick="joinRoom()">
 
@@ -56,32 +84,40 @@
 
 <script>
 
-function generateRoomId(){
+// ---------------- GENERATE ROOM ----------------
 
-    let randomId =
-    Math.random().toString(36)
-    .substring(2, 8);
+function generateRoom(){
+
+    const roomId =
+    Math.random()
+    .toString(36)
+    .substring(2,10);
 
     document
     .getElementById("room-id")
-    .value = randomId;
+    .value = roomId;
 }
+
+
+// ---------------- JOIN ROOM ----------------
 
 function joinRoom(){
 
-    let room =
+    const room =
     document
     .getElementById("room-id")
-    .value;
+    .value
+    .trim();
 
-    if(room.trim() == ""){
+    if(room !== ""){
 
-        return;
+        window.location.href =
+        `/chat/${room}`;
     }
-
-    window.location.href =
-    "/chat/" + room;
 }
+
+
+// ---------------- ENTER KEY ----------------
 
 document
 .getElementById("room-id")
