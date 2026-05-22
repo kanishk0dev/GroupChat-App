@@ -316,14 +316,13 @@ function openPopup(){
 
     fetch("/generate-invite", {
         method:      "POST",
-        credentials: "same-origin",
+        credentials: "include",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded"
         },
         body: "room=" + encodeURIComponent(room)
     })
     .then(function(res){
-        // parse JSON regardless of status code
         return res.json().then(function(data){
             return { status: res.status, data: data };
         });
@@ -357,7 +356,6 @@ function copyInviteLink(){
         showCopied();
     })
     .catch(function(){
-        // fallback
         input.select();
         document.execCommand("copy");
         showCopied();
