@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
 import uuid
 import os
-import resend
+import requests
 
 app = Flask(__name__)
 
@@ -11,12 +11,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get(
     "SECRET_KEY",
     "secret123"
-)
-
-# ---------------- RESEND CONFIG ----------------
-
-resend.api_key = os.environ.get(
-    "RESEND_API_KEY"
 )
 
 # ---------------- SOCKET ----------------
@@ -100,28 +94,42 @@ def logout():
 @app.route('/send-invite', methods=['POST'])
 def send_invite():
 
-    email = request.form['email']
-
-    room = request.form['room']
-
-    # generate unique token
-    token = str(uuid.uuid4())
-
-    # store invite
-    invite_links[token] = {
-
-        "room": room,
-        "used": False
-    }
-
-    # production url
-    BASE_URL = request.host_url.rstrip('/')
-
-    invite_link = f"{BASE_URL}/invite/{token}"
-
     try:
 
-        params = {
+        email = request.form['email']
+
+        room = request.form['room']
+
+        # generate unique token
+        token = str(uuid.uuid4())
+
+        # save invite
+        invite_links[token] = {
+
+            "room": room,
+            "used": False
+        }
+
+        BASE_URL = request.host_url.rstrip('/')
+
+        invite_link = f"{BASE_URL}/invite/{token}"
+
+        # ---------------- RESEND API ----------------
+
+        api_key = os.environ.get(
+            "RESEND_API_KEY"
+        )
+
+        headers = {
+
+            "Authorization":
+            f"Bearer {api_key}",
+
+            "Content-Type":
+            "application/json"
+        }
+
+        data = {
 
             "from":
             "Chat App <onboarding@resend.dev>",
@@ -134,58 +142,69 @@ def send_invite():
 
             "html":
             f"""
-            <div style="
-                font-family:Arial;
-                padding:20px;
-            ">
+            <div style='font-family:Arial;'>
 
                 <h2>
-                    You are invited!
+                    Chat Room Invite
                 </h2>
 
                 <p>
-                    Click below to join the chat room:
+                    Click below to join:
                 </p>
 
                 <a href="{invite_link}"
                    style="
-                        display:inline-block;
-                        padding:12px 20px;
                         background:#2563eb;
                         color:white;
+                        padding:12px 20px;
                         text-decoration:none;
                         border-radius:10px;
+                        display:inline-block;
                    ">
-                    Join Chat Room
+                    Join Chat
                 </a>
 
                 <br><br>
 
-                <p>
-                    This invite link works
-                    only one time.
-                </p>
+                <b>
+                    This invite works only once.
+                </b>
 
             </div>
             """
         }
 
-        resend.Emails.send(params)
+        response = requests.post(
 
-        return "Invite Sent Successfully!"
+            "https://api.resend.com/emails",
+
+            headers=headers,
+
+            json=data
+        )
+
+        print(response.text)
+
+        if response.status_code == 200:
+
+            return "Invite Sent Successfully!"
+
+        else:
+
+            return "Failed To Send Invite"
 
     except Exception as e:
 
         print(e)
 
-        return "Failed To Send Invite"
+        return "Error Sending Invite"
 
 # ---------------- INVITE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    # invalid token
+    # invalid link
     if token not in invite_links:
 
         return "Invalid Invite Link"
@@ -195,12 +214,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link after first click
+    # expire link
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room in session
+    # save room temporarily
     session['invite_room'] = room
 
     # redirect login
@@ -213,14 +232,13 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET EVENTS ----------------
+# ---------------- SOCKET ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
 
-# realtime messages
 @socketio.on('message')
 def handle_message(data):
 
