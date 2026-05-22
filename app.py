@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
-from flask_mail import Mail, Message
 import uuid
 import os
+import resend
 
 app = Flask(__name__)
 
@@ -13,23 +13,11 @@ app.secret_key = os.environ.get(
     "secret123"
 )
 
-# ---------------- MAIL CONFIG ----------------
+# ---------------- RESEND CONFIG ----------------
 
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-
-app.config['MAIL_PORT'] = 587
-
-app.config['MAIL_USE_TLS'] = True
-
-app.config['MAIL_USERNAME'] = os.environ.get(
-    "MAIL_USERNAME"
+resend.api_key = os.environ.get(
+    "RESEND_API_KEY"
 )
-
-app.config['MAIL_PASSWORD'] = os.environ.get(
-    "MAIL_PASSWORD"
-)
-
-mail = Mail(app)
 
 # ---------------- SOCKET ----------------
 
@@ -131,36 +119,58 @@ def send_invite():
 
     invite_link = f"{BASE_URL}/invite/{token}"
 
-    # ---------------- EMAIL ----------------
-
-    msg = Message(
-
-        subject="Chat Room Invitation",
-
-        sender=app.config['MAIL_USERNAME'],
-
-        recipients=[email]
-    )
-
-    msg.body = f"""
-Hello,
-
-You have been invited to join a chat room.
-
-Click the link below:
-
-{invite_link}
-
-IMPORTANT:
-This invite link works ONLY ONE TIME.
-
-After first use,
-it will expire automatically.
-"""
-
     try:
 
-        mail.send(msg)
+        params = {
+
+            "from":
+            "Chat App <onboarding@resend.dev>",
+
+            "to":
+            [email],
+
+            "subject":
+            "Chat Room Invitation",
+
+            "html":
+            f"""
+            <div style="
+                font-family:Arial;
+                padding:20px;
+            ">
+
+                <h2>
+                    You are invited!
+                </h2>
+
+                <p>
+                    Click below to join the chat room:
+                </p>
+
+                <a href="{invite_link}"
+                   style="
+                        display:inline-block;
+                        padding:12px 20px;
+                        background:#2563eb;
+                        color:white;
+                        text-decoration:none;
+                        border-radius:10px;
+                   ">
+                    Join Chat Room
+                </a>
+
+                <br><br>
+
+                <p>
+                    This invite link works
+                    only one time.
+                </p>
+
+            </div>
+            """
+        }
+
+        resend.Emails.send(params)
 
         return "Invite Sent Successfully!"
 
@@ -168,7 +178,7 @@ it will expire automatically.
 
         print(e)
 
-        return "Failed To Send Email"
+        return "Failed To Send Invite"
 
 # ---------------- INVITE ----------------
 
@@ -185,12 +195,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link
+    # expire link after first click
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # temporary session
+    # save room in session
     session['invite_room'] = room
 
     # redirect login

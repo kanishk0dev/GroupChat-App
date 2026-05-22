@@ -1,6 +1,6 @@
 Flask
 Flask-SocketIO
-Flask-Mail
 gunicorn
 gevent
 gevent-websocket
+resend
