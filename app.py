@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from flask_socketio import SocketIO, join_room, send
-from flask_mail import Mail, Message
 import uuid
 import os
+import requests
 
 app = Flask(__name__)
 
@@ -13,24 +13,6 @@ app.secret_key = os.environ.get(
     "secret123"
 )
 
-# ---------------- MAIL CONFIG ----------------
-
-app.config['MAIL_SERVER'] = 'smtp-relay.brevo.com'
-
-app.config['MAIL_PORT'] = 587
-
-app.config['MAIL_USE_TLS'] = True
-
-app.config['MAIL_USERNAME'] = os.environ.get(
-    "MAIL_USERNAME"
-)
-
-app.config['MAIL_PASSWORD'] = os.environ.get(
-    "MAIL_PASSWORD"
-)
-
-mail = Mail(app)
-
 # ---------------- SOCKET ----------------
 
 socketio = SocketIO(
@@ -38,7 +20,7 @@ socketio = SocketIO(
     cors_allowed_origins="*"
 )
 
-# ---------------- INVITES ----------------
+# ---------------- INVITE STORAGE ----------------
 
 invite_links = {}
 
@@ -58,7 +40,7 @@ def login():
 
     session['username'] = username
 
-    # invite flow
+    # invite redirect flow
     if 'invite_room' in session:
 
         room = session['invite_room']
@@ -118,7 +100,7 @@ def send_invite():
 
         room = request.form['room']
 
-        # unique token
+        # generate unique token
         token = str(uuid.uuid4())
 
         # store invite
@@ -128,63 +110,73 @@ def send_invite():
             "used": False
         }
 
+        # base url
         BASE_URL = request.host_url.rstrip('/')
 
+        # invite link
         invite_link = f"{BASE_URL}/invite/{token}"
 
-        # email message
-        msg = Message(
-
-            "Chat Room Invitation",
-
-            sender=app.config['MAIL_USERNAME'],
-
-            recipients=[email]
+        # web3forms key
+        access_key = os.environ.get(
+            "WEB3FORMS_ACCESS_KEY"
         )
 
-        msg.html = f"""
+        # email payload
+        payload = {
 
-        <div style="font-family:Arial;">
+            "access_key":
+            access_key,
 
-            <h2>
-                You are invited!
-            </h2>
+            "subject":
+            "Chat Room Invitation",
 
-            <p>
-                Click below to join:
-            </p>
+            "from_name":
+            "Realtime Chat App",
 
-            <a href="{invite_link}"
-               style="
-                    background:#2563eb;
-                    color:white;
-                    padding:12px 20px;
-                    border-radius:10px;
-                    text-decoration:none;
-               ">
-                Join Chat Room
-            </a>
+            "email":
+            email,
 
-            <br><br>
+            "message":
+            f"""
+You are invited to join the chat room.
 
-            <b>
-                This link works only once.
-            </b>
+Open this link:
 
-        </div>
-        """
+{invite_link}
 
-        mail.send(msg)
+IMPORTANT:
+This invite works only once.
+"""
+        }
 
-        return "Invite Sent Successfully!"
+        # send email request
+        response = requests.post(
+
+            "https://api.web3forms.com/submit",
+
+            json=payload
+        )
+
+        result = response.json()
+
+        print(result)
+
+        # success
+        if result["success"]:
+
+            return "Invite Sent Successfully!"
+
+        else:
+
+            return "Failed To Send Invite"
 
     except Exception as e:
 
-        print(e)
+        print("ERROR:", e)
 
         return f"ERROR: {str(e)}"
 
-# ---------------- INVITE ----------------
+# ---------------- INVITE ROUTE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
@@ -199,12 +191,12 @@ def invite(token):
 
         return "Invite Link Expired"
 
-    # expire link
+    # expire after first use
     invite_links[token]["used"] = True
 
     room = invite_links[token]["room"]
 
-    # save room in session
+    # temporary room session
     session['invite_room'] = room
 
     # redirect login
@@ -217,12 +209,14 @@ def embed():
 
     return render_template('embed.html')
 
-# ---------------- SOCKET ----------------
+# ---------------- SOCKET JOIN ----------------
 
 @socketio.on('join')
 def handle_join(data):
 
     join_room(data['room'])
+
+# ---------------- REALTIME MESSAGE ----------------
 
 @socketio.on('message')
 def handle_message(data):
