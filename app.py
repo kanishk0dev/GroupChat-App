@@ -8,99 +8,84 @@ app = Flask(__name__)
 # ---------------- SESSION CONFIG ----------------
 
 app.config['SESSION_COOKIE_SAMESITE'] = "None"
-
 app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # ---------------- IFRAME SUPPORT ----------------
 
 @app.after_request
 def add_header(response):
-
     response.headers['X-Frame-Options'] = 'ALLOWALL'
-
     response.headers['Content-Security-Policy'] = "frame-ancestors *"
-
     return response
 
 # ---------------- SECRET KEY ----------------
 
-app.secret_key = os.environ.get(
-    "SECRET_KEY",
-    "secret123"
-)
+app.secret_key = os.environ.get("SECRET_KEY", "secret123")
 
 # ---------------- SOCKET ----------------
 
 socketio = SocketIO(
-
     app,
-
     cors_allowed_origins="*",
-
     manage_session=True
 )
 
 # ---------------- STORAGE ----------------
 
-invite_links = {}
+# room -> single permanent token (never expires)
+room_invite_tokens = {}
+
+# token -> room (reverse lookup)
+token_to_room = {}
 
 # room -> admin user_id
 room_admins = {}
 
-# room -> users
+# room -> list of users
 room_users = {}
 
-# connected socket users
+# sid -> user data
 connected_users = {}
 
 # ---------------- HOME ----------------
 
 @app.route('/')
 def home():
-
-    return render_template('login.html',
-                           invite_room=session.get('invite_room', ''))
+    return render_template(
+        'login.html',
+        invite_room=session.get('invite_room', '')
+    )
 
 # ---------------- LOGIN ----------------
 
 @app.route('/login', methods=['POST'])
 def login():
 
-    username = request.form['username']
+    username = request.form.get('username', '').strip()
 
-    # hidden unique user id
+    if not username:
+        return redirect('/')
+
     session['user_id'] = str(uuid.uuid4())
-
     session['username'] = username
 
-    # invite flow
     if 'invite_room' in session:
-
-        room = session['invite_room']
-
-        session.pop('invite_room', None)
-
+        room = session.pop('invite_room')
         session['is_invited_user'] = True
-
         return redirect(f'/chat/{room}')
 
     session['is_invited_user'] = False
-
     return redirect('/dashboard')
 
 # ---------------- DASHBOARD ----------------
 
 @app.route('/dashboard')
 def dashboard():
-
     if 'username' not in session:
-
         return redirect('/')
-
     return render_template(
-
         'dashboard.html',
-
         username=session['username']
     )
 
@@ -108,154 +93,99 @@ def dashboard():
 
 @app.route('/chat/<room>')
 def chat(room):
-
     if 'username' not in session:
-
         return redirect('/')
 
     username = session['username']
+    user_id  = session['user_id']
 
-    user_id = session['user_id']
-
-    # first user becomes admin
+    # first person into the room becomes admin
     if room not in room_admins:
-
         room_admins[room] = user_id
+        # creator is never an invited user
+        session['is_invited_user'] = False
 
-    # real admin check by user_id
-    is_admin = room_admins[room] == user_id
+    is_admin = (room_admins[room] == user_id)
 
-    # invited users cannot invite
+    # invited users can never invite others
     if session.get('is_invited_user'):
-
         is_admin = False
 
     return render_template(
-
         'chat.html',
-
         username=username,
-
         room=room,
-
         is_admin=is_admin
     )
-
-# ---------------- LOGOUT ----------------
-
-@app.route('/logout')
-def logout():
-
-    session.clear()
-
-    return redirect('/')
 
 # ---------------- GENERATE INVITE ----------------
 
 @app.route('/generate-invite', methods=['POST'])
 def generate_invite():
 
-    # invited users blocked
-    if session.get('is_invited_user'):
+    # must be logged in
+    if 'user_id' not in session:
+        return jsonify({"error": "Not logged in"}), 401
 
-        return jsonify({
-
-            "error":
-            "Not Allowed"
-        })
+    # invited users cannot generate links
+    if session.get('is_invited_user') is True:
+        return jsonify({"error": "Not allowed"}), 403
 
     room = request.form.get('room', '').strip()
-
     if not room:
+        return jsonify({"error": "Room not specified"}), 400
 
-        return jsonify({"error": "Room not specified"})
+    # FIX: only the admin of this room can generate a link
+    user_id = session['user_id']
+    if room in room_admins and room_admins[room] != user_id:
+        return jsonify({"error": "Not the admin"}), 403
 
-    token = str(uuid.uuid4())
-
-    # FIX: store token with use_count instead of boolean
-    # allows multiple people to use generated links
-    invite_links[token] = {
-
-        "room": room,
-
-        "use_count": 0,
-
-        "max_uses": 10   # allow up to 10 uses per token
-    }
+    # reuse existing token for this room, or create one
+    if room not in room_invite_tokens:
+        token = str(uuid.uuid4())
+        room_invite_tokens[room] = token
+        token_to_room[token] = room
+    else:
+        token = room_invite_tokens[room]
 
     BASE_URL = request.host_url.rstrip('/')
-
     invite_link = f"{BASE_URL}/invite/{token}"
 
-    return jsonify({
-
-        "link": invite_link
-    })
+    return jsonify({"link": invite_link})
 
 # ---------------- INVITE ----------------
 
 @app.route('/invite/<token>')
 def invite(token):
 
-    if token not in invite_links:
+    # FIX: use reverse lookup dict — O(1), no loop
+    room = token_to_room.get(token)
 
-        return "Invalid Invite Link", 404
-
-    invite_data = invite_links[token]
-
-    # FIX: check use_count against max_uses
-    if invite_data["use_count"] >= invite_data["max_uses"]:
-
-        return "Invite Link Expired", 410
-
-    # increment use count
-    invite_links[token]["use_count"] += 1
-
-    room = invite_data["room"]
+    if not room:
+        return "Invalid invite link.", 404
 
     session['invite_room'] = room
-
     return redirect('/')
 
 # ---------------- EMBED ----------------
 
 @app.route('/embed')
 def embed():
-
     return render_template('embed.html')
 
 # ---------------- UPDATE USERS ----------------
 
 def update_room_users(room):
-
-    if room not in room_users:
-
-        room_users[room] = []
-
-    users_list = []
-
-    for user in room_users[room]:
-
-        users_list.append({
-
-            "username": user['username'],
-
-            # admin check by user_id
-            "admin":
-            user['user_id'] == room_admins.get(room)
-        })
-
-    socketio.emit(
-
-        'update_users',
-
+    users_list = [
         {
-
-            "count": len(room_users[room]),
-
-            "users": users_list
-        },
-
+            "username": u['username'],
+            "admin": u['user_id'] == room_admins.get(room)
+        }
+        for u in room_users.get(room, [])
+    ]
+    socketio.emit(
+        'update_users',
+        {"count": len(users_list), "users": users_list},
         room=room
     )
 
@@ -263,58 +193,34 @@ def update_room_users(room):
 
 @socketio.on('join')
 def handle_join(data):
-
-    room = data['room']
-
+    room     = data['room']
     username = data['username']
-
-    user_id = data['user_id']
+    user_id  = data['user_id']
 
     join_room(room)
 
     connected_users[request.sid] = {
-
         "username": username,
-
-        "room": room,
-
-        "user_id": user_id
+        "room":     room,
+        "user_id":  user_id
     }
 
     if room not in room_users:
-
         room_users[room] = []
 
-    # unique by user_id
-    user_exists = False
+    already_in = any(
+        u['user_id'] == user_id
+        for u in room_users[room]
+    )
 
-    for user in room_users[room]:
-
-        if user['user_id'] == user_id:
-
-            user_exists = True
-
-    if not user_exists:
-
+    if not already_in:
         room_users[room].append({
-
-            "user_id": user_id,
-
+            "user_id":  user_id,
             "username": username
         })
-
-        # joined message
-
         emit(
-
             'user_status',
-
-            {
-
-                "message":
-                f"{username} joined the chat"
-            },
-
+            {"message": f"{username} joined the chat"},
             room=room
         )
 
@@ -324,31 +230,15 @@ def handle_join(data):
 
 @socketio.on('message')
 def handle_message(data):
-
-    emit(
-
-        'message',
-
-        data,
-
-        room=data['room']
-    )
+    emit('message', data, room=data['room'])
 
 # ---------------- DELETE MESSAGE ----------------
 
 @socketio.on('delete_message')
 def delete_message(data):
-
     emit(
-
         'delete_message',
-
-        {
-
-            "id": data['id']
-
-        },
-
+        {"id": data['id']},
         room=data['room']
     )
 
@@ -356,62 +246,32 @@ def delete_message(data):
 
 @socketio.on('disconnect')
 def disconnect_user():
-
     if request.sid not in connected_users:
-
         return
 
-    user_data = connected_users[request.sid]
-
-    room = user_data['room']
-
-    user_id = user_data['user_id']
-
-    username = user_data['username']
+    user_data = connected_users.pop(request.sid)
+    room      = user_data['room']
+    user_id   = user_data['user_id']
+    username  = user_data['username']
 
     leave_room(room)
 
     if room in room_users:
-
         room_users[room] = [
-
-            user for user in room_users[room]
-
-            if user['user_id'] != user_id
+            u for u in room_users[room]
+            if u['user_id'] != user_id
         ]
 
-    # left message
-
     emit(
-
         'user_status',
-
-        {
-
-                "message":
-                f"{username} left the chat"
-        },
-
+        {"message": f"{username} left the chat"},
         room=room
     )
 
     update_room_users(room)
 
-    del connected_users[request.sid]
-
 # ---------------- MAIN ----------------
 
 if __name__ == '__main__':
-
-    port = int(
-        os.environ.get("PORT", 5000)
-    )
-
-    socketio.run(
-
-        app,
-
-        host='0.0.0.0',
-
-        port=port
-    )
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
